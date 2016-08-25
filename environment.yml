@@ -1,0 +1,6 @@
+name: muffnn
+dependencies:
+  - python=3.5
+  - numpy=1.11.1
+  - scipy=0.18.0
+  - scikit-learn=0.17.1

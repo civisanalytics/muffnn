@@ -1,0 +1,13 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  override:
+    - docker info
+    - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+    - docker build -t civisanalytics/muffnn .
+
+test:
+  override:
+    - docker run civisanalytics/muffnn bash -c "cd /src/muffnn && py.test muffnn && flake8 ."

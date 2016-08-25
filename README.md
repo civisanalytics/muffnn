@@ -1,1 +1,62 @@
-# muffnn
+# Introduction
+
+This project provides multilayer perceptron predictive models, implemented
+using [TensorFlow](https://www.tensorflow.org/) and following the 
+[scikit-learn](http://scikit-learn.org)
+[Predictor API](http://scikit-learn.org/stable/developers/contributing.html#apis-of-scikit-learn-objects).
+
+# Installation
+
+Installation with `conda` and `pip` is recommended:
+
+```bash
+conda env create -f environment.yml
+source activate muffnn
+# See comment below about TF_BINARY_URL.
+pip install $TF_BINARY_URL
+pip install .
+```
+
+Google provides TensorFlow pip wheels for different OSs and architectures.
+See [this page](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#pip-installation)
+for more details.  For Python 3.5 on 64-bit Linux with no GPU, set
+`export TF_BINARY_URL=https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0rc0-cp35-cp35m-linux_x86_64.whl`.
+
+For development, a few additional dependencies are needed:
+
+```bash
+conda install flake8 pytest nose
+```
+
+# Usage
+
+To use the code, import one of the predictor classes and use it as you would
+other predictors such as `LogisticRegression`. An example:
+
+```python
+from muffnn import MLPClassifier
+
+X, y = load_some_data()
+
+mlp = MLPClassifier()
+mlp.fit(X, y)
+
+X_new = load_some_unlabeled_data()
+y_pred = mlp.predict(X_new)
+```
+
+# Contributing
+
+See `CONTIBUTING.md` for information about contributing to this project.
+
+# License
+
+BSD-3
+
+See `LICENSE.txt` for details.
+
+# Related Tools
+
+* [sklearn.neural_network](http://scikit-learn.org/dev/modules/classes.html#module-sklearn.neural_network)
+* [tensorflow.contrib.learn](https://github.com/tensorflow/tensorflow/tree/r0.10/tensorflow/contrib/learn/python/learn)
+* [keras.wrappers.scikit_learn](https://keras.io/scikit-learn-api/)
