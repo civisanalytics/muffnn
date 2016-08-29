@@ -60,3 +60,10 @@ See `LICENSE.txt` for details.
 * [sklearn.neural_network](http://scikit-learn.org/dev/modules/classes.html#module-sklearn.neural_network)
 * [tensorflow.contrib.learn](https://github.com/tensorflow/tensorflow/tree/r0.10/tensorflow/contrib/learn/python/learn)
 * [keras.wrappers.scikit_learn](https://keras.io/scikit-learn-api/)
+
+# Contributors
+
+* [Mike Heilman](https://github.com/mheilman/)
+* [Walt Askew](https://github.com/waltaskew/)
+* [Matt Becker](https://github.com/beckermr/)
+* [Bill Lattner](https://github.com/wlattner/)
