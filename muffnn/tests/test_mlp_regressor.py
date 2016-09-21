@@ -74,3 +74,16 @@ def test_replicability():
     pred1 = clf.fit(X_diabetes, target).predict(X_diabetes)
     pred2 = clf.fit(X_diabetes, target).predict(X_diabetes)
     assert_array_almost_equal(pred1, pred2)
+
+
+def test_partial_fit():
+    data = load_diabetes()
+    clf = MLPRegressor(n_epochs=1)
+
+    X, y = data['data'], data['target']
+
+    for _ in range(30):
+        clf.partial_fit(X, y)
+
+    y_pred = clf.predict(X)
+    print(y[:5], y_pred[:5], np.mean(np.abs(y - y_pred)))

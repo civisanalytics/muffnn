@@ -86,9 +86,102 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         """
         _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
 
-        # Check that the input is an array or sparse matrix.
+        self._fitted = False
+        return self.partial_fit(X, y)
+
+    def partial_fit(self, X, y):
+        """Fit the model on a batch of training data.
+
+        Parameters
+        ----------
+        X : numpy array or sparse matrix of shape [n_samples, n_features]
+            Training data
+        y : numpy array of shape [n_samples, n_targets]
+            Target values
+
+        Returns
+        -------
+        self : returns an instance of self.
+        """
+
+        X, y = self._check_inputs(X, y)
+
+        random_state = check_random_state(self.random_state)
+        assert self.batch_size > 0, "batch_size <= 0"
+
+        y = self._preprocess_targets(y)
+
+        # Initialize the model if it hasn't been already by a previous call.
+        if not self._is_fitted:
+            self.is_sparse_ = sp.issparse(X)
+            self.input_layer_sz_ = X.shape[1]
+
+            # Instantiate the graph.  TensorFlow seems easier to use by just
+            # adding to the default graph, and as_default lets you temporarily
+            # set a graph to be treated as the default graph.
+            self.graph_ = Graph()
+            with self.graph_.as_default():
+                tf_random_seed.set_random_seed(
+                    random_state.randint(0, 10000000))
+
+                tf.get_variable_scope().set_initializer(
+                    tf.uniform_unit_scaling_initializer(self.init_scale))
+
+                self._set_up_graph()
+                self._session = tf.Session()
+
+                # Train model parameters.
+                self._session.run(tf.initialize_all_variables())
+
+            # Set an attributed to mark this as at least partially fitted.
+            self._fitted = True
+
+        # Train the model with the given data.
+        with self.graph_.as_default():
+            n_examples = X.shape[0]
+            start_idx = 0
+            epoch = 0
+            indices = np.arange(n_examples)
+            random_state.shuffle(indices)
+
+            while True:
+                batch_ind = indices[start_idx:start_idx + self.batch_size]
+                feed_dict = self._make_feed_dict(X[batch_ind],
+                                                 y[batch_ind])
+                obj_val, _ = self._session.run(
+                    [self._obj_func, self._train_step], feed_dict=feed_dict)
+                _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
+                             obj_val, epoch, start_idx)
+                start_idx += self.batch_size
+                if start_idx > n_examples - self.batch_size:
+                    start_idx = 0
+                    epoch += 1
+                    if epoch >= self.n_epochs:
+                        break
+                    random_state.shuffle(indices)
+
+        return self
+
+    @property
+    def _is_fitted(self):
+        """Return True if the model has been at least partially fitted.
+
+        Returns
+        -------
+        bool
+
+        Notes
+        -----
+        This is to indicate whether, e.g., the TensorFlow graph for the model
+        has been created.
+        """
+        return getattr(self, '_fitted', False)
+
+    def _check_inputs(self, X, y):
+        # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
         X, y = check_X_y(X, y, accept_sparse='csr', multi_output=True)
+
         if y.ndim == 2 and y.shape[1] == 1:
             # Following
             # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/ensemble/forest.py#L223,
@@ -98,68 +191,12 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
                  "(n_samples,), for example using ravel().",
                  DataConversionWarning, stacklevel=2)
             y = y[:, 0]
-
-        random_state = check_random_state(self.random_state)
-        assert self.batch_size > 0, "batch_size <= 0"
-
-        y = self._preprocess_targets(y)
-
-        n_examples = X.shape[0]
-        # Make sure the batch size isn't bigger than the dataset.
-        batch_size = min(self.batch_size, n_examples)
-
-        self.is_sparse_ = sp.issparse(X)
-        self.input_layer_sz_ = X.shape[1]
-
-        # Instantiate the graph.  TensorFlow seems easier to use by just adding
-        # to the default graph, and as_default lets you temporarily set a
-        # graph to be treated as the default graph.
-        self.graph_ = Graph()
-        with self.graph_.as_default():
-            tf_random_seed.set_random_seed(random_state.randint(0, 10000000))
-
-            tf.get_variable_scope().set_initializer(
-                tf.uniform_unit_scaling_initializer(self.init_scale))
-
-            self._init_model()
-            self._session = tf.Session()
-
-            # Train model parameters.
-            self._session.run(tf.initialize_all_variables())
-
-            start_idx = 0
-            epoch = 0
-            indices = np.arange(n_examples)
-            random_state.shuffle(indices)
-
-            while True:
-                batch_ind = indices[start_idx:start_idx + batch_size]
-                feed_dict = self._make_feed_dict(X[batch_ind],
-                                                 y[batch_ind])
-                obj_val, _ = self._session.run(
-                    [self._obj_func, self._train_step], feed_dict=feed_dict)
-                _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
-                             obj_val, epoch, start_idx)
-                start_idx += batch_size
-                if start_idx > n_examples - batch_size:
-                    start_idx = 0
-                    epoch += 1
-                    if epoch >= self.n_epochs:
-                        break
-                    random_state.shuffle(indices)
-
-        # Set an attributed to make this as fitted.
-        self._fitted = True
-
-        # Make the graph read-only.
-        self.graph_.finalize()
-
-        return self
+        return X, y
 
     def __getstate__(self):
         # Override __getstate__ so that TF model parameters are pickled
         # properly.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
             tempfile = NamedTemporaryFile(delete=False)
             tempfile.close()
             try:
@@ -182,7 +219,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         )
 
         # Add fitted attributes if the model has been fitted.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
             state['_fitted'] = True
             state['input_layer_sz_'] = self.input_layer_sz_
             state['is_sparse_'] = self.is_sparse_
@@ -207,7 +244,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
                     f.write(state['_saved_model'])
                 self.graph_ = Graph()
                 with self.graph_.as_default():
-                    self._init_model()
+                    self._set_up_graph()
                     self._session = tf.Session()
                     self._saver.restore(self._session, tempfile.name)
             finally:
@@ -221,7 +258,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
     def _init_model_objective_fn(self, t):
         pass
 
-    def _init_model(self):
+    def _set_up_graph(self):
         """Initialize TF objects (needed before fitting or restoring)."""
 
         # A placeholder to control dropout for training vs. prediction.
@@ -299,7 +336,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
     def _compute_output(self, X):
         """Get the outputs of the network, for use in prediction methods."""
 
-        if not getattr(self, '_fitted', False):
+        if not self._is_fitted:
             raise NotFittedError("Call fit before prediction")
 
         X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])

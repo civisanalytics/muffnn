@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 from sklearn.base import ClassifierMixin
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.multiclass import type_of_target
 
 import tensorflow as tf
@@ -125,21 +126,78 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t, tf.cast(self.input_targets_, np.float32))
         self._obj_func = tf.reduce_mean(cross_entropy)
 
-    def _preprocess_targets(self, y):
+    def partial_fit(self, X, y, classes=None, multilabel=False):
+        """Fit the model on a batch of training data.
+
+        Parameters
+        ----------
+        X : numpy array or sparse matrix of shape [n_samples, n_features]
+            Training data
+        y : numpy array of shape [n_samples, n_targets]
+            Target values
+        classes : array, shape (n_classes,)
+            Classes to be used across calls to partial_fit.  If not set in the
+            first call, it will be inferred from the given targets. If
+            subsequent calls include additional classes, they will fail.
+
+        Returns
+        -------
+        self : returns an instance of self.
+
+        Notes
+        -----
+        This is based on
+        http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
+        """
+
+        # Validate that the classes argument is as expected.
+        if self._is_fitted:
+            if classes is not None and classes != self.classes_:
+                raise ValueError(
+                    "The classes given to partial_fit differ from the ones "
+                    "stored in self.classes_")
+        elif classes is not None:
+            # Following sklearn, we'll keep a separate classes_ variable
+            # instead of just the encoder.
+            # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/linear_model/logistic.py#L1528-L1531
+            self._enc = LabelEncoder().fit(classes)
+            self.classes_ = self._enc.classes_
+
+        # Now, just call the base class partial_fit.
+        # Infer classes from y if not set.
+        return super().partial_fit(X, y)
+
+    def _is_multilabel(self, y):
+        """
+        Return whether the given target array corresponds to a multilabel
+        problem.
+        """
         target_type = type_of_target(y)
 
         if target_type in ['binary', 'multiclass']:
-            # Note: np.unique returns values in sorted order.
-            self.classes_, y_ind = np.unique(y, return_inverse=True)
-            self.multilabel_ = False
+            return False
         elif target_type == 'multilabel-indicator':
-            self.classes_ = np.array([0, 1])
-            y_ind = y
-            self.multilabel_ = True
+            return True
         else:
             # Raise an error, as in
             # sklearn.utils.multiclass.check_classification_targets.
             raise ValueError("Unknown label type: %r" % y)
+
+    def _preprocess_targets(self, y):
+
+        if not self._is_fitted:
+            self.multilabel_ = self._is_multilabel(y)
+
+            # Set classes_ and _enc if not set by partial_fit.
+            if getattr(self, 'classes_', None) is None:
+                if self.multilabel_:
+                    self._enc = None
+                    self.classes_ = np.array([0, 1])
+                else:
+                    self._enc = LabelEncoder().fit(y)
+                    self.classes_ = self._enc.classes_
+
+        y_ind = y if self.multilabel_ else self._enc.transform(y)
 
         return y_ind
 
@@ -193,7 +251,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         state = super().__getstate__()
 
         # Add the fitted attributes particular to this subclass.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
+            state['_enc'] = self.classes_
             state['classes_'] = self.classes_
             state['multilabel_'] = self.multilabel_
 

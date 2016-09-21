@@ -103,11 +103,17 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
     def _preprocess_targets(self, y):
         # Standardize the targets for fitting, and store the M and SD values
         # for prediction.
-        self.target_mean_ = np.mean(y)
+
+        if not self._is_fitted:
+            self.target_mean_ = np.mean(y)
         y_centered = y - self.target_mean_
-        self.target_sd_ = np.std(y_centered)
+
+        if not self._is_fitted:
+            self.target_sd_ = np.std(y_centered)
+            if self.target_sd_ <= 0:
+                warn("No variance in regression targets.")
+
         if self.target_sd_ <= 0:
-            warn("No variance in regression targets.")
             return y_centered
 
         return y_centered / self.target_sd_
@@ -142,7 +148,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         state = super().__getstate__()
 
         # Add the fitted attributes particular to this subclass.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
             state['target_mean_'] = self.target_mean_
             state['target_sd_'] = self.target_sd_
 
