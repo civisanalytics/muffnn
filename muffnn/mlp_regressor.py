@@ -104,19 +104,22 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         # Standardize the targets for fitting, and store the M and SD values
         # for prediction.
 
-        if not self._is_fitted:
-            self.target_mean_ = np.mean(y)
         y_centered = y - self.target_mean_
-
-        if not self._is_fitted:
-            self.target_sd_ = np.std(y_centered)
-            if self.target_sd_ <= 0:
-                warn("No variance in regression targets.")
 
         if self.target_sd_ <= 0:
             return y_centered
 
         return y_centered / self.target_sd_
+
+    def _fit_targets(self, y):
+        # Store the mean and S.D. of the targets so we can have standardized
+        # y for training but still make predictions on the original scale.
+
+        self.target_mean_ = np.mean(y)
+
+        self.target_sd_ = np.std(y - self.target_mean_)
+        if self.target_sd_ <= 0:
+            warn("No variance in regression targets.")
 
     def _init_model_objective_fn(self, t):
         self._obj_func = tf.reduce_mean((self.input_targets_ - t) ** 2)

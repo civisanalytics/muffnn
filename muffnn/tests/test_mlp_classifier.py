@@ -200,3 +200,11 @@ def test_partial_fit():
     with pytest.raises(ValueError):
         clf = MLPClassifier(n_epochs=1)
         clf.partial_fit(X, y, classes=np.array([0, 1]))
+
+    # Check that fitting twice works.
+    clf = MLPClassifier(n_epochs=1)
+    clf.fit(X, y)
+    assert np.array_equal(clf.classes_, np.unique(y))
+    y_binary = (y == y[0]).astype(float)
+    clf.fit(X, y_binary)
+    assert np.array_equal(clf.classes_, np.unique(y_binary))

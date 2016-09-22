@@ -86,10 +86,23 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         """
         _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
 
+        # Mark the model as not fitted (i.e., not fully initialized based on
+        # the data).
         self._fitted = False
+
+        # Set the target preprocessing variables, which could otherwise be set
+        # based on the classes argument to partial_fit.
+        self._fit_targets(y)
+
+        # Call partial fit, which will initialize and then train the model.
         return self.partial_fit(X, y)
 
-    def partial_fit(self, X, y):
+    def _fit_targets(self, y):
+        # This can be overwritten to set instance variables that pertain to the
+        # targets (e.g., an array of class labels).
+        pass
+
+    def partial_fit(self, X, y, **kwargs):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -109,10 +122,13 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         random_state = check_random_state(self.random_state)
         assert self.batch_size > 0, "batch_size <= 0"
 
-        y = self._preprocess_targets(y)
-
         # Initialize the model if it hasn't been already by a previous call.
-        if not self._is_fitted:
+        if self._is_fitted:
+            y = self._preprocess_targets(y)
+        else:
+            self._fit_targets(y, **kwargs)
+            y = self._preprocess_targets(y)
+
             self.is_sparse_ = sp.issparse(X)
             self.input_layer_sz_ = X.shape[1]
 

@@ -126,7 +126,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t, tf.cast(self.input_targets_, np.float32))
         self._obj_func = tf.reduce_mean(cross_entropy)
 
-    def partial_fit(self, X, y, classes=None, multilabel=False):
+    def partial_fit(self, X, y, classes=None):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -149,23 +149,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         This is based on
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
-
-        # Validate that the classes argument is as expected.
-        if self._is_fitted:
-            if classes is not None and classes != self.classes_:
-                raise ValueError(
-                    "The classes given to partial_fit differ from the ones "
-                    "stored in self.classes_")
-        elif classes is not None:
-            # Following sklearn, we'll keep a separate classes_ variable
-            # instead of just the encoder.
-            # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/linear_model/logistic.py#L1528-L1531
-            self._enc = LabelEncoder().fit(classes)
-            self.classes_ = self._enc.classes_
-
-        # Now, just call the base class partial_fit.
-        # Infer classes from y if not set.
-        return super().partial_fit(X, y)
+        return super().partial_fit(X, y, classes=classes)
 
     def _is_multilabel(self, y):
         """
@@ -183,23 +167,23 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             # sklearn.utils.multiclass.check_classification_targets.
             raise ValueError("Unknown label type: %r" % y)
 
+    def _fit_targets(self, y, classes=None):
+        self.multilabel_ = self._is_multilabel(y)
+
+        # If provided, use classes to fit the encoded and set classes_.
+        # Otherwise, find the unique classes in y.
+        if classes is not None:
+            y = classes
+
+        if self.multilabel_:
+            self._enc = None
+            self.classes_ = np.array([0, 1])
+        else:
+            self._enc = LabelEncoder().fit(y)
+            self.classes_ = self._enc.classes_
+
     def _preprocess_targets(self, y):
-
-        if not self._is_fitted:
-            self.multilabel_ = self._is_multilabel(y)
-
-            # Set classes_ and _enc if not set by partial_fit.
-            if getattr(self, 'classes_', None) is None:
-                if self.multilabel_:
-                    self._enc = None
-                    self.classes_ = np.array([0, 1])
-                else:
-                    self._enc = LabelEncoder().fit(y)
-                    self.classes_ = self._enc.classes_
-
-        y_ind = y if self.multilabel_ else self._enc.transform(y)
-
-        return y_ind
+        return y if self.multilabel_ else self._enc.transform(y)
 
     def predict_proba(self, X):
         """Predict probabilities for each class.
