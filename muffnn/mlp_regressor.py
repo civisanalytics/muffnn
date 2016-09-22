@@ -100,7 +100,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
 
         return t
 
-    def _preprocess_targets(self, y):
+    def _transform_targets(self, y):
         # Standardize the targets for fitting, and store the M and SD values
         # for prediction.
 
@@ -140,7 +140,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         y_pred = self._compute_output(X)
 
         # Put the prediction back on the scale of the target values
-        # (cf. _preprocess_targets).
+        # (cf. _transform_targets).
         if self.target_sd_ > 0.0:
             y_pred *= self.target_sd_
         y_pred += self.target_mean_

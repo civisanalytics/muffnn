@@ -65,7 +65,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
     There is currently no dropout for sparse input layers.
     """
 
-    def _preprocess_targets(self, y):
+    def _transform_targets(self, y):
         # This can be overridden to, e.g., map label names to indices when
         # fitting a classifier.
         return y
@@ -120,10 +120,10 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
 
         # Initialize the model if it hasn't been already by a previous call.
         if self._is_fitted:
-            y = self._preprocess_targets(y)
+            y = self._transform_targets(y)
         else:
             self._fit_targets(y, **kwargs)
-            y = self._preprocess_targets(y)
+            y = self._transform_targets(y)
 
             self.is_sparse_ = sp.issparse(X)
             self.input_layer_sz_ = X.shape[1]

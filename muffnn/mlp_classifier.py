@@ -182,7 +182,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             self._enc = LabelEncoder().fit(y)
             self.classes_ = self._enc.classes_
 
-    def _preprocess_targets(self, y):
+    def _transform_targets(self, y):
         return y if self.multilabel_ else self._enc.transform(y)
 
     def predict_proba(self, X):
