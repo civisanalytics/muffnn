@@ -88,11 +88,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
 
         # Mark the model as not fitted (i.e., not fully initialized based on
         # the data).
-        self._fitted = False
-
-        # Set the target preprocessing variables, which could otherwise be set
-        # based on the classes argument to partial_fit.
-        self._fit_targets(y)
+        self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
         return self.partial_fit(X, y)
@@ -150,7 +146,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
                 self._session.run(tf.initialize_all_variables())
 
             # Set an attributed to mark this as at least partially fitted.
-            self._fitted = True
+            self._is_fitted = True
 
         # Train the model with the given data.
         with self.graph_.as_default():
@@ -192,6 +188,17 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         has been created.
         """
         return getattr(self, '_fitted', False)
+
+    @_is_fitted.setter
+    def _is_fitted(self, b):
+        """Set whether the model has been at least partially fitted.
+
+        Parameters
+        ----------
+        b : bool
+            True if the model has been fitted.
+        """
+        self._fitted = b
 
     def _check_inputs(self, X, y):
         # Check that the input X is an array or sparse matrix.

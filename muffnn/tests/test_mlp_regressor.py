@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.utils.testing import \
     assert_equal, assert_array_almost_equal
 import scipy.sparse as sp
+from scipy.stats import pearsonr
 from sklearn.datasets import load_diabetes
 from sklearn.utils.estimator_checks import check_estimator
 from tensorflow import nn
@@ -86,4 +87,4 @@ def test_partial_fit():
         clf.partial_fit(X, y)
 
     y_pred = clf.predict(X)
-    print(y[:5], y_pred[:5], np.mean(np.abs(y - y_pred)))
+    assert pearsonr(y_pred, y)[0] > 0.5

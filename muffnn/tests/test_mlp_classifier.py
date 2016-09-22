@@ -201,7 +201,13 @@ def test_partial_fit():
         clf = MLPClassifier(n_epochs=1)
         clf.partial_fit(X, y, classes=np.array([0, 1]))
 
-    # Check that fitting twice works.
+
+def test_refitting():
+    # Check that fitting twice works (e.g., to make sure that fit-related
+    # variables are cleared appropriately when refitting).
+
+    X, y = iris.data, iris.target
+
     clf = MLPClassifier(n_epochs=1)
     clf.fit(X, y)
     assert np.array_equal(clf.classes_, np.unique(y))
