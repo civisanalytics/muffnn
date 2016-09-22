@@ -10,6 +10,7 @@ import pickle
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 import scipy.sparse as sp
 from sklearn.datasets import load_iris
 from sklearn.linear_model.tests.test_logistic import check_predictions
@@ -177,3 +178,39 @@ def test_replicability():
     probs1 = clf.fit(iris.data, target).predict_proba(iris.data)
     probs2 = clf.fit(iris.data, target).predict_proba(iris.data)
     assert_array_almost_equal(probs1, probs2)
+
+
+def test_partial_fit():
+    X, y = iris.data, iris.target
+
+    # Predict on the training set and check that it (over)fit as expected.
+    clf = MLPClassifier(n_epochs=1)
+    for _ in range(30):
+        clf.partial_fit(X, y)
+    y_pred = clf.predict(X)
+    assert ((y_pred - y) ** 2).mean() < 10
+
+    # Check that the classes argument works.
+    clf = MLPClassifier(n_epochs=1)
+    clf.partial_fit(X[:10], y[:10], classes=np.unique(y))
+    for _ in range(30):
+        clf.partial_fit(X, y)
+
+    # Check that using the classes argument wrong will fail.
+    with pytest.raises(ValueError):
+        clf = MLPClassifier(n_epochs=1)
+        clf.partial_fit(X, y, classes=np.array([0, 1]))
+
+
+def test_refitting():
+    # Check that fitting twice works (e.g., to make sure that fit-related
+    # variables are cleared appropriately when refitting).
+
+    X, y = iris.data, iris.target
+
+    clf = MLPClassifier(n_epochs=1)
+    clf.fit(X, y)
+    assert np.array_equal(clf.classes_, np.unique(y))
+    y_binary = (y == y[0]).astype(float)
+    clf.fit(X, y_binary)
+    assert np.array_equal(clf.classes_, np.unique(y_binary))

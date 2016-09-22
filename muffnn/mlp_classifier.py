@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 from sklearn.base import ClassifierMixin
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.multiclass import type_of_target
 
 import tensorflow as tf
@@ -125,23 +126,64 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t, tf.cast(self.input_targets_, np.float32))
         self._obj_func = tf.reduce_mean(cross_entropy)
 
-    def _preprocess_targets(self, y):
+    def partial_fit(self, X, y, classes=None):
+        """Fit the model on a batch of training data.
+
+        Parameters
+        ----------
+        X : numpy array or sparse matrix of shape [n_samples, n_features]
+            Training data
+        y : numpy array of shape [n_samples, n_targets]
+            Target values
+        classes : array, shape (n_classes,)
+            Classes to be used across calls to partial_fit.  If not set in the
+            first call, it will be inferred from the given targets. If
+            subsequent calls include additional classes, they will fail.
+
+        Returns
+        -------
+        self : returns an instance of self.
+
+        Notes
+        -----
+        This is based on
+        http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
+        """
+        return super().partial_fit(X, y, classes=classes)
+
+    def _is_multilabel(self, y):
+        """
+        Return whether the given target array corresponds to a multilabel
+        problem.
+        """
         target_type = type_of_target(y)
 
         if target_type in ['binary', 'multiclass']:
-            # Note: np.unique returns values in sorted order.
-            self.classes_, y_ind = np.unique(y, return_inverse=True)
-            self.multilabel_ = False
+            return False
         elif target_type == 'multilabel-indicator':
-            self.classes_ = np.array([0, 1])
-            y_ind = y
-            self.multilabel_ = True
+            return True
         else:
             # Raise an error, as in
             # sklearn.utils.multiclass.check_classification_targets.
             raise ValueError("Unknown label type: %r" % y)
 
-        return y_ind
+    def _fit_targets(self, y, classes=None):
+        self.multilabel_ = self._is_multilabel(y)
+
+        # If provided, use classes to fit the encoded and set classes_.
+        # Otherwise, find the unique classes in y.
+        if classes is not None:
+            y = classes
+
+        if self.multilabel_:
+            self._enc = None
+            self.classes_ = np.array([0, 1])
+        else:
+            self._enc = LabelEncoder().fit(y)
+            self.classes_ = self._enc.classes_
+
+    def _transform_targets(self, y):
+        return y if self.multilabel_ else self._enc.transform(y)
 
     def predict_proba(self, X):
         """Predict probabilities for each class.
@@ -193,7 +235,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         state = super().__getstate__()
 
         # Add the fitted attributes particular to this subclass.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
+            state['_enc'] = self.classes_
             state['classes_'] = self.classes_
             state['multilabel_'] = self.multilabel_
 

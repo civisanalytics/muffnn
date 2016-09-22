@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.utils.testing import \
     assert_equal, assert_array_almost_equal
 import scipy.sparse as sp
+from scipy.stats import pearsonr
 from sklearn.datasets import load_diabetes
 from sklearn.utils.estimator_checks import check_estimator
 from tensorflow import nn
@@ -74,3 +75,16 @@ def test_replicability():
     pred1 = clf.fit(X_diabetes, target).predict(X_diabetes)
     pred2 = clf.fit(X_diabetes, target).predict(X_diabetes)
     assert_array_almost_equal(pred1, pred2)
+
+
+def test_partial_fit():
+    data = load_diabetes()
+    clf = MLPRegressor(n_epochs=1)
+
+    X, y = data['data'], data['target']
+
+    for _ in range(30):
+        clf.partial_fit(X, y)
+
+    y_pred = clf.predict(X)
+    assert pearsonr(y_pred, y)[0] > 0.5

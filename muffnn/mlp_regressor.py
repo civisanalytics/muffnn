@@ -100,17 +100,26 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
 
         return t
 
-    def _preprocess_targets(self, y):
+    def _transform_targets(self, y):
         # Standardize the targets for fitting, and store the M and SD values
         # for prediction.
-        self.target_mean_ = np.mean(y)
+
         y_centered = y - self.target_mean_
-        self.target_sd_ = np.std(y_centered)
+
         if self.target_sd_ <= 0:
-            warn("No variance in regression targets.")
             return y_centered
 
         return y_centered / self.target_sd_
+
+    def _fit_targets(self, y):
+        # Store the mean and S.D. of the targets so we can have standardized
+        # y for training but still make predictions on the original scale.
+
+        self.target_mean_ = np.mean(y)
+
+        self.target_sd_ = np.std(y - self.target_mean_)
+        if self.target_sd_ <= 0:
+            warn("No variance in regression targets.")
 
     def _init_model_objective_fn(self, t):
         self._obj_func = tf.reduce_mean((self.input_targets_ - t) ** 2)
@@ -131,7 +140,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         y_pred = self._compute_output(X)
 
         # Put the prediction back on the scale of the target values
-        # (cf. _preprocess_targets).
+        # (cf. _transform_targets).
         if self.target_sd_ > 0.0:
             y_pred *= self.target_sd_
         y_pred += self.target_mean_
@@ -142,7 +151,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         state = super().__getstate__()
 
         # Add the fitted attributes particular to this subclass.
-        if getattr(self, '_fitted', False):
+        if self._is_fitted:
             state['target_mean_'] = self.target_mean_
             state['target_sd_'] = self.target_sd_
 
