@@ -10,10 +10,12 @@ from sklearn.utils.testing import assert_array_almost_equal
 from ..tfbase import TFPicklingBase
 
 
-# example class for using TFPicklingBase - adds a scalar to input 1d arrays
+# example class for using TFPicklingBase - adds a scalar to input 1d
+# arrays
 class TFAdder(TFPicklingBase):
     def __init__(self, add_val):
-        # real scikit-learn estimators should do all of this work in the fit method
+        # real scikit-learn estimators should do all of this work in the
+        # fit method
         self.add_val = float(add_val)
         self.graph_ = tf.Graph()
         with self.graph_.as_default():
@@ -23,7 +25,9 @@ class TFAdder(TFPicklingBase):
 
     def _set_up_graph(self):
         self._a = tf.placeholder(tf.float32, shape=[None], name='a')
-        self._add_val = tf.Variable(self.add_val,  name='add_val', dtype=tf.float32)
+        self._add_val = tf.Variable(self.add_val,
+                                    name='add_val',
+                                    dtype=tf.float32)
         self._sum = tf.add(self._a, self._add_val, name='sum')
 
     def add(self, a):
@@ -39,11 +43,13 @@ class TFAdder(TFPicklingBase):
 
         return state
 
+
 def test_add():
     """Test that child class interface to base class works as expected"""
     a = np.arange(10)
     adder = TFAdder(11)
     assert_array_almost_equal(adder.add(a), a + 11)
+
 
 def test_pickling():
     """Test that models can be pickled and reloaded."""
