@@ -10,8 +10,6 @@ Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 from abc import ABCMeta, abstractmethod
 import logging
 import re
-import os
-from tempfile import NamedTemporaryFile
 from warnings import warn
 
 import numpy as np
@@ -28,6 +26,8 @@ from tensorflow.python.framework.ops import Graph
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.framework import random_seed as tf_random_seed
 from tensorflow.python.ops import init_ops
+
+from .tfbase import TFPicklingBase
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def _affine(input_tensor, output_size, bias=True, bias_start=0.0,
     return t
 
 
-class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
+class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     """Base class for multilayer perceptron models
 
     Notes
@@ -139,8 +139,7 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
                 tf.get_variable_scope().set_initializer(
                     tf.uniform_unit_scaling_initializer(self.init_scale))
 
-                self._set_up_graph()
-                self._session = tf.Session()
+                self._build_tf_graph()
 
                 # Train model parameters.
                 self._session.run(tf.initialize_all_variables())
@@ -174,32 +173,6 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
 
         return self
 
-    @property
-    def _is_fitted(self):
-        """Return True if the model has been at least partially fitted.
-
-        Returns
-        -------
-        bool
-
-        Notes
-        -----
-        This is to indicate whether, e.g., the TensorFlow graph for the model
-        has been created.
-        """
-        return getattr(self, '_fitted', False)
-
-    @_is_fitted.setter
-    def _is_fitted(self, b):
-        """Set whether the model has been at least partially fitted.
-
-        Parameters
-        ----------
-        b : bool
-            True if the model has been fitted.
-        """
-        self._fitted = b
-
     def _check_inputs(self, X, y):
         # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
@@ -217,61 +190,25 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         return X, y
 
     def __getstate__(self):
-        # Override __getstate__ so that TF model parameters are pickled
-        # properly.
-        if self._is_fitted:
-            tempfile = NamedTemporaryFile(delete=False)
-            tempfile.close()
-            try:
-                # Serialize the model and read it so it can be pickled.
-                self._saver.save(self._session, tempfile.name)
-                with open(tempfile.name, 'rb') as f:
-                    saved_model = f.read()
-            finally:
-                os.unlink(tempfile.name)
+        # Handles TF persistence
+        state = super().__getstate__()
 
-        # Note: don't include the graph since it can be recreated.
-        state = dict(
-            activation=self.activation,
-            batch_size=self.batch_size,
-            dropout=self.dropout,
-            hidden_units=self.hidden_units,
-            init_scale=self.init_scale,
-            random_state=self.random_state,
-            n_epochs=self.n_epochs,
-        )
+        # Add attributes of this estimator
+        state.update(dict(activation=self.activation,
+                          batch_size=self.batch_size,
+                          dropout=self.dropout,
+                          hidden_units=self.hidden_units,
+                          init_scale=self.init_scale,
+                          random_state=self.random_state,
+                          n_epochs=self.n_epochs,
+                          ))
 
         # Add fitted attributes if the model has been fitted.
         if self._is_fitted:
-            state['_fitted'] = True
             state['input_layer_sz_'] = self.input_layer_sz_
             state['is_sparse_'] = self.is_sparse_
-            state['_saved_model'] = saved_model
 
         return state
-
-    def __setstate__(self, state):
-        # Override __setstate__ so that TF model parameters are unpickled
-        # properly.
-        for k, v in state.items():
-            if k == '_saved_model':
-                continue
-            self.__dict__[k] = v
-
-        if state.get('_fitted', False):
-            tempfile = NamedTemporaryFile(delete=False)
-            tempfile.close()
-            try:
-                # Write out the serialized model that can be restored by TF.
-                with open(tempfile.name, 'wb') as f:
-                    f.write(state['_saved_model'])
-                self.graph_ = Graph()
-                with self.graph_.as_default():
-                    self._set_up_graph()
-                    self._session = tf.Session()
-                    self._saver.restore(self._session, tempfile.name)
-            finally:
-                os.unlink(tempfile.name)
 
     @abstractmethod
     def _init_model_output(self, t):
@@ -321,8 +258,6 @@ class MLPBaseEstimator(BaseEstimator, metaclass=ABCMeta):
         self._init_model_objective_fn(t)
 
         self._train_step = tf.train.AdamOptimizer().minimize(self._obj_func)
-
-        self._saver = tf.train.Saver()
 
     def _make_feed_dict(self, X, y=None):
         # Make the dictionary mapping tensor placeholders to input data.
