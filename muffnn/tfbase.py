@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-A mixin for pickling TensorFlow-based scikit-learn estimators.
+A base class for pickling TensorFlow-based scikit-learn estimators.
 """
 import os
 from abc import ABCMeta, abstractmethod
@@ -12,50 +12,55 @@ class TFPicklingBase(metaclass=ABCMeta):
     """Base class for pickling TensorFlow-based scikit-learn estimators.
 
     This base class defines a few standard attributes to enable fairly
-    transparent pickling of TensorFlow models.
+    transparent pickling of TensorFlow models. Note that TensorFlow has
+    a custom saving mechanism that makes pickling (and thus using it in
+    scikit-learn, etc.) nontrivial.
 
-    Upon pickling an object, if the self._is_fitted property is True:
+    When pickling an object, if the `self._is_fitted` property is True:
 
-        1. The session at self._session is saved using the saver at
-            self._saver to a temporary file.
+        1. The session at `self._session` is saved using the saver at
+            `self._saver` to a temporary file.
 
         2. The saved data is then read into memory and attached to the
             object state at '_saved_model'.
 
         3. The fitted state of the model is saved at '_fitted' as True.
 
-    Upon unpickling the object:
+    When unpickling the object:
 
-        1. All things in the state of the object are set using self.__dict__
-            except the '_saved_model' entry.
+        1. All variables in the state of the object are set using
+            `self.__dict__` except the '_saved_model' entry.
 
         2. If the '_fitted' key is in the state of the object and is True
 
             2a. The '_saved_model' entry is written to a temporary file.
-            2b. A new TF graph is instantiated at self.graph_.
-            2c. self._build_tf_graph() is called. This sets a Saver at
-                self._saver and a Session at self._session.
-            2d. The self._saver is used to restore previous session to the
+            2b. A new TF graph is instantiated at `self.graph_`.
+            2c. `self._build_tf_graph()`` is called. This instantiates a
+                `tf.Saver` at `self._saver` and a `tf.Session` at
+                `self._session`.
+            2d. The `self._saver` is used to restore previous session to the
                 current one.
 
     To use this base class properly, the child class needs to
 
-        1. Implement the abstract method self._set_up_graph. This method
-            should simply build the required TF ops.
+        1. Implement the abstract method `self._set_up_graph`. This method
+            should build the required TF graph.
 
-        2. Exactly once, instantiate a TF graph at self.graph_ and then
-            call self._build_tf_graph inside this context block.
-            self._build_tf_graph will call self._set_up_graph and further
-            instantiate the Saver and Session.
+        2. Exactly once (e.g., in the `fit` method), instantiate a `tf.Graph`
+            at `self.graph_` and then call `self._build_tf_graph` inside the
+            `tf.Graph` context block. `self._build_tf_graph` will call
+            `self._set_up_graph` and further instantiate the `tf.Saver` and
+            `tf.Session`.
 
         3. After 2. is done, set `self._is_fitted = True`.
 
-        4. Make sure override __getstate__ to store any extra information
+        4. Make sure override `__getstate__` to store any extra information
            about your estimator to the state of the object. When doing this,
            call `state = super().__getstate__()` and then append to the
            `state`.
 
-    See the example below.
+    See the example below and also the MLP classes and base class,
+    MLPBaseEstimator.
 
     Example
     -------
@@ -168,7 +173,7 @@ class TFPicklingBase(metaclass=ABCMeta):
                 os.unlink(tempfile.name)
 
     def _build_tf_graph(self):
-        """build the TF graph, setup model saving and setup a TF session
+        """Build the TF graph, setup model saving and setup a TF session.
 
         Notes
         -----
@@ -179,7 +184,7 @@ class TFPicklingBase(metaclass=ABCMeta):
             self._session = tf.Session()
             ```
 
-        These calls are made after self._set_up_graph() is called.
+        These calls are made after `self._set_up_graph()`` is called.
 
         See the main class docs for how to properly call this method from a
         child class.
@@ -190,10 +195,11 @@ class TFPicklingBase(metaclass=ABCMeta):
 
     @abstractmethod
     def _set_up_graph(self):
-        """abstract method to assemble the TF graph for estimator
+        """Assemble the TF graph for estimator.
 
         Notes
         -----
-        Child classes should add the TF ops they want to implement here.
+        Child classes should add the TF ops to the graph they want to
+        implement here.
         """
         pass
