@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.utils.testing import assert_array_almost_equal
 
-from ..tfbase import TFPicklingBase
+from ..core import TFPicklingBase
 
 
 # example class for using TFPicklingBase - adds a scalar to input 1d

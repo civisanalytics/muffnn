@@ -14,7 +14,8 @@ from sklearn.base import RegressorMixin
 
 import tensorflow as tf
 from tensorflow.python.ops import nn
-from muffnn.base import MLPBaseEstimator, _affine
+from .base import MLPBaseEstimator
+from ..core import affine
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,11 +89,11 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
 
     def _init_model_output(self, t):
         if self.is_sparse_ and not self.hidden_units:
-            t = _affine(t, 1, input_sz=self.input_layer_sz_,
-                        scope='output_layer', sparse_input=True)
+            t = affine(t, 1, input_size=self.input_layer_sz_,
+                       scope='output_layer', sparse_input=True)
         else:
             t = tf.nn.dropout(t, keep_prob=self._dropout)
-            t = _affine(t, 1, scope='output_layer')
+            t = affine(t, 1, scope='output_layer')
 
         self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")
         t = tf.reshape(t, [-1])  # Convert to 1d tensor.

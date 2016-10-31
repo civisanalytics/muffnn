@@ -1,5 +1,5 @@
-from muffnn.base import MLPBaseEstimator
-from muffnn.mlp_classifier import MLPClassifier
-from muffnn.mlp_regressor import MLPRegressor
+from .mlp.mlp_classifier import MLPClassifier
+from .mlp.mlp_regressor import MLPRegressor
+from .core import TFPicklingBase
 
-__all__ = ['MLPBaseEstimator', 'MLPClassifier', 'MLPRegressor']
+__all__ = ['MLPClassifier', 'MLPRegressor', 'TFPicklingBase']
