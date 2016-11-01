@@ -249,10 +249,11 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     # you have to set the elements not updated to logits
                     # of -inf. Then they come out to zero after the
                     # softmax and so fall out of the sumexp.
-                    msk = tf.squeeze(self._categorical_msks[i, :, :])
+                    msk = tf.transpose(
+                        tf.squeeze(self._categorical_msks[i, :, :]))
                     ninf = tf.constant(-np.inf)
                     t = ((1.0 - msk) * t +
-                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf))
+                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf, dim=0))
 
             # Discrete 0/1 stuff.
             # Sigmoid output w/ cross-entropy.
