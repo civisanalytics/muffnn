@@ -8,14 +8,11 @@ from io import BytesIO
 import pickle
 
 import numpy as np
-import pytest
 import scipy.special
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.datasets import load_iris
 from sklearn.utils.estimator_checks import check_estimator
-from sklearn.utils.testing import (assert_array_equal,
-                                   assert_array_almost_equal,
-                                   assert_equal,
+from sklearn.utils.testing import (assert_array_almost_equal,
                                    assert_almost_equal)
 
 from muffnn import Autoencoder
@@ -122,6 +119,74 @@ def test_mse_dropout():
     assert ae_score_nodropout < ae_score_dropout, ("MSE with dropout should "
                                                    "be more than MSE with no "
                                                    " dropout!")
+
+
+def test_persistence():
+    """Make sure we can pickle it."""
+    X = iris.data  # Use the iris features.
+    X = MinMaxScaler().fit_transform(X)
+
+    ae = Autoencoder(hidden_units=(1,),
+                     n_epochs=1000,
+                     random_state=4556,
+                     learning_rate=1e-2,
+                     dropout=0.0)
+    Xenc = ae.fit_transform(X)
+
+    b = BytesIO()
+    pickle.dump(ae, b)
+    ae_pickled = pickle.loads(b.getvalue())
+    Xenc_pickled = ae_pickled.transform(X)
+    assert_array_almost_equal(Xenc, Xenc_pickled)
+
+
+def test_replicability():
+    """Make sure it can be seeded properly."""
+    X = iris.data  # Use the iris features.
+    X = MinMaxScaler().fit_transform(X)
+
+    ae1 = Autoencoder(hidden_units=(1,),
+                      n_epochs=1000,
+                      random_state=4556,
+                      learning_rate=1e-2,
+                      dropout=0.0)
+    Xenc1 = ae1.fit_transform(X)
+
+    ae2 = Autoencoder(hidden_units=(1,),
+                      n_epochs=1000,
+                      random_state=4556,
+                      learning_rate=1e-2,
+                      dropout=0.0)
+    Xenc2 = ae2.fit_transform(X)
+
+    assert_array_almost_equal(Xenc1, Xenc2)
+
+
+def test_refitting():
+    """Make sure that refitting resets internals."""
+    X = iris.data  # Use the iris features.
+    X = MinMaxScaler().fit_transform(X)
+
+    # Use digitize to make a discrete problem.
+    for i in range(X.shape[1]):
+        bins = [0.0, np.median(X[:, i]), 1.1]
+        X[:, i] = np.digitize(X[:, i], bins) - 1.0
+
+    ae = Autoencoder(hidden_units=(1,),
+                     n_epochs=1000,
+                     random_state=4556,
+                     learning_rate=1e-2,
+                     dropout=0.0,
+                     metric='cross-entropy')
+    ae.fit(X)
+    assert ae.input_layer_sz_ == 4, ("Input layer is the wrong size for the "
+                                     "Autoencoder!")
+
+    X_small = X[:, 0:-1]
+    assert X_small.shape != X.shape, "Test data for refitting does not work!"
+    ae.fit(X_small)
+    assert ae.input_layer_sz_ == 3, ("Input layer is the wrong size for the "
+                                     "Autoencoder!")
 
 
 def _cross_entropy_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
@@ -312,45 +377,3 @@ def test_mixed_cross_entropy_single_hidden_unit():
                              [0, 2], [0, 1, 2, 3]]:
         _check_cross_entropy_mixed_single_hidden_unit(
             discrete_indices=discrete_indices)
-
-
-
-# def test_smoke_mixed_metric():
-#     """Make sure it works with a mixed metric."""
-#     pass
-#
-# def test_persistence():
-#     """Make sure we can pickle it."""
-#     pass
-#
-# def test_replicability():
-#     """Make sure it can be seeded properly."""
-#     pass
-#
-# def test_partial_fit():
-#     """"Test partial fit interface"""
-#     pass
-#
-# def test_refitting():
-#     """Make sure that refitting resets internals."""
-#     pass
-
-# def test_smoke_mixed_metric():
-#     """Make sure it works with a mixed metric."""
-#     pass
-#
-# def test_persistence():
-#     """Make sure we can pickle it."""
-#     pass
-#
-# def test_replicability():
-#     """Make sure it can be seeded properly."""
-#     pass
-#
-# def test_partial_fit():
-#     """"Test partial fit interface"""
-#     pass
-#
-# def test_refitting():
-#     """Make sure that refitting resets internals."""
-#     pass
