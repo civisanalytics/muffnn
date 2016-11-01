@@ -148,6 +148,19 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                                             "input_values")
         t = self._input_values
 
+        self._default_msk = tf.placeholder(tf.float32,
+                                           [None, self.input_layer_sz_],
+                                           "default_msk")
+
+        self._discrete_msk = tf.placeholder(tf.float32,
+                                            [None, self.input_layer_sz_],
+                                            "discrete_msk")
+
+        self._categorical_msks = tf.placeholder(
+            tf.float32,
+            [None, None, self.input_layer_sz_],
+            "categorical_msks")
+
         # Fan in layers.
         for i, layer_sz in enumerate(self.hidden_units):
             # Don't dropout inputs.
@@ -187,10 +200,6 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         """Add ops for output layer and scores to the graph."""
         scores = 0.0
 
-        # Normalization factor for objective function. Is set to the total
-        # number of variables below.
-        num_vars_norm = 0.0
-
         # Below a transpose on `t` is needed if the TF ops `scatter_update` or
         # `gather` are used on the features dimension of `t` (i.e., dim 2).
         # A shortcut has been added here to avoid a transpose if it is not
@@ -198,10 +207,6 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         if (self.categorical_begin_ is None and
                 self.categorical_size_ is None and
                 self.discrete_indices_ is None):
-
-            # Norm. factor should be the number of variables, which is just the
-            # input layer size in this case.
-            num_vars_norm = self.input_layer_sz_
 
             if self.metric == 'mse':
                 if self.activation and self.activation[1]:
@@ -221,75 +226,71 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             # The transpose since gather and scatter work on first dim.
             t = tf.transpose(t)
 
-            # Indices to use for the default metric. Indices for categorical
-            # or discrete var are removed.
-            def_indices = set(range(self.input_layer_sz_))
-
             # Categorical vars w/ one-hot encoding.
-            if self.categorical_begin_ and self.categorical_size_:
-                # Use number of variables, not the total one-hot encoding
-                # length for normalization.
-                num_vars_norm += len(self.categorical_begin_)
+            # Softmax all of the categorical stuff and use cross-entropy.
+            if (self.categorical_begin_ is not None and
+                    self.categorical_size_ is not None):
 
-                # Softmax all of the categorical stuff and use cross-entropy.
-                for begin, size in zip(self.categorical_begin_,
-                                       self.categorical_size_):
-                    # Remove categorical stuff from def_indices.
-                    def_indices -= set(range(begin, begin+size))
-
+                for i, begin, size in zip(range(len(self.categorical_begin_)),
+                                          self.categorical_begin_,
+                                          self.categorical_size_):
                     scores += tf.reduce_sum(
                         tf.nn.softmax_cross_entropy_with_logits(
                             tf.slice(t, [begin, 0], [size, -1]),
-                            tf.slice(self._input_values,
+                            tf.slice(tf.transpose(self._input_values),
                                      [begin, 0], [size, -1])),
                         reduction_indices=[0])
 
-                    t = tf.scatter_update(
-                        t,
-                        list(range(begin, begin+size)),
-                        tf.nn.softmax(tf.slice(t, [begin, 0], [size, -1])))
+                    # This one is painful. TensorFlow does not, AFAIK,
+                    # support assignments to Tensors that come out of
+                    # operations (it does support assignments to Variables).
+                    # So I am using a precomputed mask to to update certain
+                    # values. Because softmax has a sumexp operation,
+                    # you have to set the elements not updated to logits
+                    # of -inf. Then they come out to zero after the
+                    # softmax and so fall out of the sumexp.
+                    msk = tf.squeeze(self._categorical_msks[i, :, :])
+                    ninf = tf.constant(-np.inf)
+                    t = ((1.0 - msk) * t +
+                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf))
 
             # Discrete 0/1 stuff.
-            if self.discrete_indices_:
-                # Remove discrete stuff.
-                def_indices -= set(self.discrete_indices_.tolist())
-                num_vars_norm += len(self.discrete_indices_)
-
-                # Sigmoid output w/ cross-entropy.
-                tsub = tf.gather(t, self.discrete_indices_.tolist())
-                isub = tf.gather(self._input_values,
-                                 self.discrete_indices_.tolist())
+            # Sigmoid output w/ cross-entropy.
+            if self.discrete_indices_ is not None:
+                tsub = tf.gather(t, self.discrete_indices_)
+                isub = tf.gather(tf.transpose(self._input_values),
+                                 self.discrete_indices_)
                 scores += tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
                     reduction_indices=[0])
 
-                t = tf.scatter_update(t,
-                                      self.discrete_indices_.tolist(),
-                                      tf.nn.sigmoid(tsub))
+                discrete_msk = tf.transpose(self._discrete_msk)
+                t = ((1.0 - discrete_msk) * t +
+                     discrete_msk * tf.nn.sigmoid(t))
 
             # Anything left uses the default metric.
-            if def_indices:
-                def_indices = sorted(list(def_indices))
-                num_vars_norm += len(def_indices)
+            if self._default_indices is not None:
+                default_msk = tf.transpose(self._default_msk)
 
                 if self.metric == 'mse':
                     if self.activation and self.activation[1]:
-                        tsub = tf.gather(t, def_indices)
-                        tsub = self.activation[1](tsub)
-                        t = tf.scatter_update(t, def_indices, tsub)
-                    else:
-                        tsub = tf.gather(t, def_indices)
-                    isub = tf.gather(self._input_values, def_indices)
+                        t = ((1.0 - default_msk) * t +
+                             default_msk * self.activation[1](t))
+                    tsub = tf.gather(t, self._default_indices)
+                    isub = tf.gather(tf.transpose(self._input_values),
+                                     self._default_indices)
                     diff = isub - tsub
                     scores += tf.reduce_sum(tf.square(diff),
-                                            reduction_indices=[0]) / 2.0
+                                            reduction_indices=[0])
                 elif self.metric == 'cross-entropy':
-                    tsub = tf.gather(t, def_indices)
-                    isub = tf.gather(self._input_values, def_indices)
+                    tsub = tf.gather(t, self._default_indices)
+                    isub = tf.gather(tf.transpose(self._input_values),
+                                     self._default_indices)
                     scores += tf.reduce_sum(
                         tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
                         reduction_indices=[0])
-                    t = tf.scatter_update(t, def_indices, tf.nn.sigmoid(tsub))
+                    t = ((1.0 - default_msk) * t +
+                         default_msk * tf.nn.sigmoid(t))
                 else:
                     raise ValueError('Metric "%s" is not allowed!' %
                                      self.metric)
@@ -298,7 +299,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             t = tf.transpose(t)
             scores = tf.transpose(scores)
 
-        return t, scores / num_vars_norm
+        return t, scores
 
     def _make_feed_dict(self, X, inverse=False, training=False):
         # Make the dictionary mapping tensor placeholders to input data.
@@ -318,6 +319,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         else:
             feed_dict[self._dropout] = \
                 self.dropout if self.dropout is not None else 0.0
+
+        feed_dict[self._discrete_msk] \
+            = self._discrete_msk_values[0:X.shape[0], :]
+
+        feed_dict[self._default_msk] \
+            = self._default_msk_values[0:X.shape[0], :]
+
+        feed_dict[self._categorical_msks] \
+            = self._categorical_msks_values[:, 0:X.shape[0], :]
 
         return feed_dict
 
@@ -359,6 +369,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             state['discrete_indices_'] = self.discrete_indices_
             state['categorical_begin_'] = self.categorical_begin_
             state['categorical_size_'] = self.categorical_size_
+            state['_discrete_msk_values'] = self._discrete_msk_values
+            state['_default_msk_values'] = self._default_msk_values
+            state['_default_indices'] = self._default_indices
+            state['_categorical_msks_values'] = self._categorical_msks_values
 
         return state
 
@@ -409,11 +423,22 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         if not self._is_fitted:
             self.input_layer_sz_ = X.shape[1]
 
+            # Indices for default metric, used for updates in metric.
+            def_indices = set(range(X.shape[1]))
+
             # Check and set categorical and discrete indices.
             self.discrete_indices_ = (np.atleast_1d(self.discrete_indices)
-                                      if self.discrete_indices else None)
+                                      if self.discrete_indices is not None
+                                      else None)
 
-            if self.categorical_begin and self.categorical_size:
+            self._discrete_msk_values \
+                = np.zeros((self.batch_size, self.input_layer_sz_))
+            if self.discrete_indices_ is not None:
+                def_indices -= set(self.discrete_indices_.tolist())
+                self._discrete_msk_values[:, self.discrete_indices_] = 1
+
+            if (self.categorical_begin is not None and
+                    self.categorical_size is not None):
                 self.categorical_begin_ = np.atleast_1d(self.categorical_begin)
                 self.categorical_size_ = np.atleast_1d(self.categorical_size)
 
@@ -422,9 +447,32 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 if sb != ss:
                     raise ValueError("categorical_begin and categorical_size "
                                      "must have the same shape!")
+
+                self._categorical_msks_values = []
+                for begin, size in zip(self.categorical_begin_,
+                                       self.categorical_size_):
+                    # Remove categorical stuff from def_indices.
+                    def_indices -= set(range(begin, begin + size))
+
+                    # Keep track of the mask.
+                    msk = np.zeros((self.batch_size, self.input_layer_sz_))
+                    msk[:, range(begin, begin + size)] = 1
+                    self._categorical_msks_values.append(msk)
+
+                self._categorical_msks_values \
+                    = np.array(self._categorical_msks_values)
             else:
                 self.categorical_size_ = None
                 self.categorical_begin_ = None
+                self._categorical_msks_values \
+                    = np.empty((1, self.batch_size, self.input_layer_sz_))
+
+            # Finally set the default indices and mask.
+            self._default_indices = np.array(list(def_indices), dtype=int)
+            self._default_msk_values \
+                = np.zeros((self.batch_size, self.input_layer_sz_))
+            if len(self._default_indices) > 0:
+                self._default_msk_values[:, self._default_indices] = 1
 
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
