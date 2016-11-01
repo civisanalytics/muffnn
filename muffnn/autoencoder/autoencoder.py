@@ -253,7 +253,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                         tf.squeeze(self._categorical_msks[i, :, :]))
                     ninf = tf.constant(-np.inf)
                     t = ((1.0 - msk) * t +
-                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf, dim=0))
+                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf,
+                                          dim=0))
 
             # Discrete 0/1 stuff.
             # Sigmoid output w/ cross-entropy.
