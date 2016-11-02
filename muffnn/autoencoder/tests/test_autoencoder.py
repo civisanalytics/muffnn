@@ -836,6 +836,7 @@ def test_cat_dropout():
         "Categorical metric with dropout should be more than "
         "categorical metric with no dropout!")
 
+
 def _cat_sparse_check(sparse_type='csr'):
     X = iris.data  # Use the iris features.
     X = MinMaxScaler().fit_transform(X)
@@ -895,6 +896,7 @@ def _cat_sparse_check(sparse_type='csr'):
                             "metric less than 5.0s for the iris features.")
 
     return ae_score
+
 
 def test_sparse_inputs():
     """Make sure sparse inputs work properly."""
