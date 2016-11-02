@@ -837,7 +837,7 @@ def test_cat_dropout():
         "categorical metric with no dropout!")
 
 
-def _cat_sparse_check(sparse_type='csr'):
+def _cat_sparse_check(sparse_type=None):
     X = iris.data  # Use the iris features.
     X = MinMaxScaler().fit_transform(X)
 
@@ -861,7 +861,8 @@ def _cat_sparse_check(sparse_type='csr'):
     cat_begin = list(np.array([0] + list(np.cumsum(cat_size)[:-1])))
 
     # Convert to a sparse format.
-    X = getattr(sp, sparse_type + '_matrix')(X)
+    if sparse_type is not None:
+        X = getattr(sp, sparse_type + '_matrix')(X)
 
     ae = Autoencoder(hidden_units=(1,),
                      n_epochs=1000,
@@ -901,7 +902,7 @@ def _cat_sparse_check(sparse_type='csr'):
 def test_sparse_inputs():
     """Make sure sparse inputs work properly."""
     scores = []
-    for sparse_type in ['csr', 'bsr', 'coo', 'csc', 'dok', 'lil']:
+    for sparse_type in [None, 'csr', 'bsr', 'coo', 'csc', 'dok', 'lil']:
         scores.append(_cat_sparse_check(sparse_type=sparse_type))
 
     # All scores should be equal.
