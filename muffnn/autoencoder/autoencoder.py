@@ -252,7 +252,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     scores += tf.nn.softmax_cross_entropy_with_logits(
                         tf.slice(t, [begin, 0], [size, -1]),
                         tf.slice(tf.transpose(self._input_values),
-                                              [begin, 0], [size, -1]),
+                                 [begin, 0], [size, -1]),
                         dim=0)
 
                     # This one is painful. TensorFlow does not, AFAIK,

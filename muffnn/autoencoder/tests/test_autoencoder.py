@@ -429,12 +429,13 @@ def _cat_mse_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
     cat_size = []
     for i in range(2, X.shape[1]):
         # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i  * np.arange(i+1) + 25.0
+        nmid = 50.0 / i * np.arange(i+1) + 25.0
         bins = ([0.0] +
                 list(np.percentile(X[:, i], nmid)) +
                 [1.1])
         oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform((np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
+        col = oe.fit_transform(
+            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
         cat_size.append(col.shape[1])
         cat_cols.append(col)
 
@@ -527,12 +528,13 @@ def _cat_cross_entropy_check(hidden_units=(1,),
     cat_size = []
     for i in range(2, X.shape[1]):
         # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i  * np.arange(i+1) + 25.0
+        nmid = 50.0 / i * np.arange(i+1) + 25.0
         bins = ([0.0] +
                 list(np.percentile(X[:, i], nmid)) +
                 [1.1])
         oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform((np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
+        col = oe.fit_transform(
+            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
         cat_size.append(col.shape[1])
         cat_cols.append(col)
 
@@ -635,8 +637,8 @@ def test_cat_cross_entropy_dropout():
         nodropout_scores.append(ae_score_nodropout)
 
         assert ae_score_nodropout < ae_score_dropout, (
-            "Categorical + cross-entropy metric with dropout should be more than "
-            "categorical + cross-entropy metric with no dropout!")
+            "Categorical + cross-entropy metric with dropout should be more "
+            "than categorical + cross-entropy metric with no dropout!")
 
     assert_almost_equal(dropout_scores[0], dropout_scores[1])
     assert_almost_equal(nodropout_scores[0], nodropout_scores[1])
@@ -657,12 +659,13 @@ def _cat_cross_entropy_mse_check(hidden_units=(1,),
     cat_size = []
     for i in range(2, X.shape[1]):
         # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i  * np.arange(i+1) + 25.0
+        nmid = 50.0 / i * np.arange(i+1) + 25.0
         bins = ([0.0] +
                 list(np.percentile(X[:, i], nmid)) +
                 [1.1])
         oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform((np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
+        col = oe.fit_transform(
+            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
         cat_size.append(col.shape[1])
         cat_cols.append(col)
 
@@ -710,7 +713,8 @@ def _cat_cross_entropy_mse_check(hidden_units=(1,),
 
 
 def test_cat_cross_entropy_mse_single_hidden_unit():
-    """Test categorical + cross-entropy + MSE metric w/ a single hidden unit."""
+    """Test categorical + cross-entropy + MSE metric w/ a single
+    hidden unit."""
     _cat_cross_entropy_mse_check(hidden_units=(1,))
 
 
