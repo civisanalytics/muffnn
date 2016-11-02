@@ -3,6 +3,7 @@ Autoencoder in scikit-learn style with TensorFlow
 """
 import logging
 import re
+import warnings
 
 import numpy as np
 import tensorflow as tf
@@ -193,8 +194,21 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         self._obj_func = tf.reduce_mean(self._scores)
 
         # Training w/ Adam for now.
-        self._train_step = tf.train.AdamOptimizer(
-            learning_rate=self.learning_rate).minimize(self._obj_func)
+        # Catching a warning related to TensorFlow sparse to dense conversions
+        # from the graph ops for the scores for mixed metrics:
+        # '.../tensorflow/python/ops/gradients.py:90: UserWarning: Converting
+        #  sparse IndexedSlices to a dense Tensor of unknown shape. This may
+        #  consume a large amount of memory.
+        #  "Converting sparse IndexedSlices to a dense Tensor of unknown
+        #  shape."'
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=("Converting sparse IndexedSlices to a dense Tensor "
+                         "of unknown shape"),
+                module='tensorflow')
+            self._train_step = tf.train.AdamOptimizer(
+                learning_rate=self.learning_rate).minimize(self._obj_func)
 
     def _build_output_layer_and_scores(self, t):
         """Add ops for output layer and scores to the graph."""
@@ -231,15 +245,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             if (self.categorical_begin_ is not None and
                     self.categorical_size_ is not None):
 
+                min_float32 = tf.constant(tf.float32.min)
                 for i, begin, size in zip(range(len(self.categorical_begin_)),
                                           self.categorical_begin_,
                                           self.categorical_size_):
-                    scores += tf.reduce_sum(
-                        tf.nn.softmax_cross_entropy_with_logits(
-                            tf.slice(t, [begin, 0], [size, -1]),
-                            tf.slice(tf.transpose(self._input_values),
-                                     [begin, 0], [size, -1])),
-                        reduction_indices=[0])
+                    scores += tf.nn.softmax_cross_entropy_with_logits(
+                        tf.slice(t, [begin, 0], [size, -1]),
+                        tf.slice(tf.transpose(self._input_values),
+                                              [begin, 0], [size, -1]),
+                        dim=0)
 
                     # This one is painful. TensorFlow does not, AFAIK,
                     # support assignments to Tensors that come out of
@@ -247,14 +261,13 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     # So I am using a precomputed mask to to update certain
                     # values. Because softmax has a sumexp operation,
                     # you have to set the elements not updated to logits
-                    # of -inf. Then they come out to zero after the
-                    # softmax and so fall out of the sumexp.
-                    msk = tf.transpose(
-                        tf.squeeze(self._categorical_msks[i, :, :]))
-                    ninf = tf.constant(-np.inf)
-                    t = ((1.0 - msk) * t +
-                         msk * tf.softmax(msk * t + (1.0 - msk) * t * ninf,
-                                          dim=0))
+                    # equal to the most negative float. Then they come out
+                    # to zero after the exp and so fall out of the sumexp.
+                    msk = tf.transpose(self._categorical_msks[i, :, :])
+                    softmax = tf.nn.softmax(
+                        msk * t + (1.0 - msk) * min_float32,
+                        dim=0)
+                    t = (1.0 - msk) * t + msk * softmax
 
             # Discrete 0/1 stuff.
             # Sigmoid output w/ cross-entropy.
@@ -299,7 +312,6 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             # Undo the transpose here. Scores are transposed too.
             t = tf.transpose(t)
-            scores = tf.transpose(scores)
 
         return t, scores
 
