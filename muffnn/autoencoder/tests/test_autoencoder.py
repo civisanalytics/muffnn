@@ -161,17 +161,84 @@ def test_refitting():
                                      "Autoencoder!")
 
 
-def _mse_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
+def _check_ae(max_score,
+              hidden_units=(1,),
+              dropout=0.0,
+              learning_rate=1e-1,
+              sparse_type=None,
+              disc_inds=None,
+              disc_inds_to_use=None,
+              cat_inds=None,
+              n_epochs=5000,
+              metric='mse'):
+    # Use the iris features.
+    X = iris.data
     X = MinMaxScaler().fit_transform(X)
 
+    # Make some columns discrete or one-hot encoded.
+    cat_size = []
+    cat_begin = []
+    dis_inds = []
+    keep_cols = []
+    def_inds = []
+    num_cols = 0
+    for i in range(X.shape[1]):
+        if disc_inds is not None and i in disc_inds:
+            bins = [0.0, np.median(X[:, i]), 1.1]
+            keep_cols.append((np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
+            dis_inds.append(num_cols)
+            num_cols += 1
+        elif cat_inds is not None and i in cat_inds:
+            # Vary the number of categories to shake out bugs.
+            bins = np.percentile(X[:, i], 100.0 / (i + 3) * np.arange(i + 4))
+            bins[0] = 0.0
+            bins[-1] = 1.1
+            oe = OneHotEncoder(sparse=False)
+            col = oe.fit_transform(
+                (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
+            keep_cols.append(col)
+            cat_begin.append(num_cols)
+            cat_size.append(col.shape[1])
+            num_cols += col.shape[1]
+        else:
+            keep_cols.append(X[:, i:i+1])
+            def_inds.append(num_cols)
+            num_cols += 1
+
+    X = np.hstack(keep_cols)
+
+    if len(cat_size) == 0:
+        cat_size = None
+        cat_begin = None
+
+    if len(dis_inds) == 0:
+        dis_inds = None
+
+    if sparse_type is not None:
+        X = getattr(sp, sparse_type + '_matrix')(X)
+
+    # For sigmoid metric runs, we can set the metric or use discrete_indices.
+    # This if handles those cases.
+    if disc_inds_to_use is None and dis_inds is not None:
+        disc_inds_to_use = dis_inds
+    elif disc_inds_to_use == -1:
+        disc_inds_to_use = None
+
     ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=4000,
+                     n_epochs=n_epochs,
                      random_state=4556,
                      learning_rate=learning_rate,
-                     dropout=dropout)
+                     dropout=dropout,
+                     metric=metric,
+                     discrete_indices=disc_inds_to_use,
+                     categorical_begin=cat_begin,
+                     categorical_size=cat_size)
+
     Xenc = ae.fit_transform(X)
     Xdec = ae.inverse_transform(Xenc)
+
+    if sparse_type is not None:
+        X = X.todense().A
 
     assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
                                                           "is not the right"
@@ -180,230 +247,131 @@ def _mse_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
     assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
                                    "shape!")
 
-    score = np.mean(np.sum((Xdec - X) ** 2, axis=1))
+    # One-hot encoded stuff should come back out normalized.
+    if cat_size is not None:
+        for begin, size in zip(cat_begin, cat_size):
+            assert_array_almost_equal(
+                np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
+
+    # Compute and test the scores.
+    scores = 0.0
+    for i in range(X.shape[1]):
+        if dis_inds is not None and i in dis_inds:
+            scores += sigmoid_cross_entropy(X[:, i:i+1], Xdec[:, i:i+1])
+        elif cat_size is not None and i in cat_begin:
+            ind = cat_begin.index(i)
+            b = cat_begin[ind]
+            s = cat_size[ind]
+            scores += softmax_cross_entropy(X[:, b:b+s], Xdec[:, b:b+s])
+        elif i in def_inds:
+            if metric == 'mse':
+                scores += np.sum((X[:, i:i+1] - Xdec[:, i:i+1]) ** 2, axis=1)
+            else:
+                scores += sigmoid_cross_entropy(X[:, i:i+1], Xdec[:, i:i+1])
+
+    ae_scores = ae.score_samples(X)
+    assert_array_almost_equal(scores, ae_scores, decimal=5)
+
+    score = np.mean(scores)
     ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score)
+    assert_almost_equal(score, ae_score, decimal=5)
 
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
+    _LOGGER.warning("\ntest info:\n    ae: %s\n    sparse format: %s\n"
+                    "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
+                    str(ae), sparse_type, ae_score,
+                    pprint.pformat(list(X[10]), compact=True),
+                    pprint.pformat(list(Xdec[10]), compact=True))
 
-    assert ae_score < 0.10, ("Autoencoder should have a MSE less than 0.10 "
-                             "for the iris features.")
+    assert ae_score < max_score, ("Autoencoder should have a score "
+                                  "less than %f for the iris features." %
+                                  max_score)
 
     return ae_score
 
 
+MSE_MAX_SCORE = 0.1
+
+
 def test_mse_single_hidden_unit():
     """Test the MSE metric w/ a single hidden unit."""
-    _mse_check(hidden_units=(1,))
+    _check_ae(MSE_MAX_SCORE, hidden_units=(1,))
 
 
 def test_mse_multiple_hidden_units():
     """Test the MSE metric w/ 2 hidden units."""
-    _mse_check(hidden_units=(2,))
+    _check_ae(MSE_MAX_SCORE, hidden_units=(2,))
 
 
 def test_mse_multiple_layers():
     """Test the MSE metric w/ layers (3, 2)."""
-    _mse_check(hidden_units=(3, 2,))
+    _check_ae(MSE_MAX_SCORE, hidden_units=(3, 2))
 
 
 def test_mse_dropout():
     """Test the MSE metric w/ dropout."""
-    ae_score_dropout = _mse_check(hidden_units=(20, 20, 10, 10, 2),
-                                  dropout=0.05,
-                                  learning_rate=1e-3)
+    ae_score_dropout = _check_ae(MSE_MAX_SCORE,
+                                 hidden_units=(20, 20, 10, 10, 2),
+                                 dropout=0.05,
+                                 learning_rate=1e-3)
 
-    ae_score_nodropout = _mse_check(hidden_units=(20, 20, 10, 10, 2),
-                                    dropout=0.0,
-                                    learning_rate=1e-3)
+    ae_score_nodropout = _check_ae(MSE_MAX_SCORE,
+                                   hidden_units=(20, 20, 10, 10, 2),
+                                   dropout=0.0,
+                                   learning_rate=1e-3)
 
     assert ae_score_nodropout < ae_score_dropout, ("MSE with dropout should "
                                                    "be more than MSE with no "
                                                    " dropout!")
 
 
-def _cross_entropy_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem.
-    for i in range(X.shape[1]):
-        bins = [0.0, np.median(X[:, i]), 1.1]
-        X[:, i] = np.digitize(X[:, i], bins) - 1.0
-
-    ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=5000,
-                     random_state=4556,
-                     learning_rate=learning_rate,
-                     dropout=dropout,
-                     metric='cross-entropy')
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    score = np.mean(sigmoid_cross_entropy(X, Xdec))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 2.80, ("Autoencoder should have a cross-entropy less "
-                             "than 2.80 for the iris features.")
-
-    return ae_score
+CE_MAX_SCORE = 3.0
 
 
 def test_cross_entropy_single_hidden_unit():
     """Test the cross-entropy metric w/ a single hidden unit."""
-    _cross_entropy_check(hidden_units=(1,))
+    _check_ae(CE_MAX_SCORE,
+              hidden_units=(1,),
+              disc_inds=range(4),
+              metric='cross-entropy')
 
 
 def test_cross_entropy_multiple_hidden_units():
     """Test the cross-entropy metric w/ 2 hidden units."""
-    _cross_entropy_check(hidden_units=(2,))
+    _check_ae(CE_MAX_SCORE,
+              hidden_units=(2,),
+              disc_inds=range(4),
+              metric='cross-entropy')
 
 
 def test_cross_entropy_multiple_layers():
     """Test the cross-entropy metric w/ layers (3, 2)."""
-    _cross_entropy_check(hidden_units=(3, 2,))
+    _check_ae(CE_MAX_SCORE,
+              hidden_units=(3, 2),
+              disc_inds=range(4),
+              metric='cross-entropy')
 
 
 def test_cross_entropy_dropout():
     """Test the cross-entropy metric w/ dropout."""
     ae_score_dropout \
-        = _cross_entropy_check(hidden_units=(20, 20, 10, 10, 2),
-                               dropout=0.05,
-                               learning_rate=1e-4)
+        = _check_ae(CE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    disc_inds=range(4),
+                    metric='cross-entropy',
+                    dropout=0.05,
+                    learning_rate=1e-4)
 
     ae_score_nodropout \
-        = _cross_entropy_check(hidden_units=(20, 20, 10, 10, 2),
-                               dropout=0.0,
-                               learning_rate=1e-4)
+        = _check_ae(CE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    disc_inds=range(4),
+                    metric='cross-entropy',
+                    dropout=0.0,
+                    learning_rate=1e-4)
 
     assert ae_score_nodropout < ae_score_dropout, (
         "Cross-entropy with dropout should be more than cross-entropy "
         "with no dropout!")
-
-
-def _cross_entropy_mse_check(hidden_units=(1,),
-                             dropout=0.0,
-                             learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for two of four columns.
-    for i in range(2, X.shape[1]):
-        bins = [0.0, np.median(X[:, i]), 1.1]
-        X[:, i] = np.digitize(X[:, i], bins) - 1.0
-
-    ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=5000,
-                     random_state=4556,
-                     learning_rate=learning_rate,
-                     dropout=dropout,
-                     metric='mse',
-                     discrete_indices=[2, 3])
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    score = np.mean(sigmoid_cross_entropy(X[:, 2:], Xdec[:, 2:]) +
-                    np.sum((X[:, 0:2] - Xdec[:, 0:2]) ** 2, axis=1))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 0.2, ("Autoencoder should have a cross-entropy + MSE "
-                            "metric less than 0.2 for the iris features.")
-
-    return ae_score
-
-
-def test_cross_entropy_mse_single_hidden_unit():
-    """Test cross-entropy + MSE metric w/ a single hidden unit."""
-    _cross_entropy_mse_check(hidden_units=(1,))
-
-
-def test_cross_entropy_mse_multiple_hidden_units():
-    """Test the cross-entropy + MSE metric w/ 2 hidden units."""
-    _cross_entropy_mse_check(hidden_units=(2,))
-
-
-def test_cross_entropy_mse_multiple_layers():
-    """Test cross-entropy + MSE metric w/ layers (3, 2)."""
-    _cross_entropy_mse_check(hidden_units=(3, 2,))
-
-
-def test_cross_entropy_mse_dropout():
-    """Test cross-entropy + MSE metric w/ dropout."""
-    ae_score_dropout \
-        = _cross_entropy_mse_check(hidden_units=(20, 20, 10, 10, 2),
-                                   dropout=0.01,
-                                   learning_rate=1e-3)
-
-    ae_score_nodropout \
-        = _cross_entropy_mse_check(hidden_units=(20, 20, 10, 10, 2),
-                                   dropout=0.0,
-                                   learning_rate=1e-3)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Cross-entropy + MSE metric with dropout should be more than "
-        "cross-entropy + MSE metric with no dropout!")
-
-
-def _cross_entropy_or_discrete_check(discrete_indices=None):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem.
-    for i in range(X.shape[1]):
-        bins = [0.0, np.median(X[:, i]), 1.1]
-        X[:, i] = np.digitize(X[:, i], bins) - 1.0
-
-    ae = Autoencoder(hidden_units=(1,),
-                     n_epochs=1000,
-                     random_state=4556,
-                     learning_rate=1e-1,
-                     dropout=0.0,
-                     metric='cross-entropy',
-                     discrete_indices=discrete_indices)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], 1), ("Encoded iris data "
-                                           "is not the right"
-                                           " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    score = np.mean(sigmoid_cross_entropy(X, Xdec))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae discrete inds, dropout, score: %s, %g, %g",
-                    pprint.pformat(discrete_indices), 0.0, ae_score)
-
-    assert ae_score < 1.50, ("Autoencoder should have a cross-entropy less "
-                             "than 1.50 for the iris features.")
-
-    return ae_score
 
 
 def test_cross_entropy_or_discrete():
@@ -411,500 +379,289 @@ def test_cross_entropy_or_discrete():
     works in all cases."""
     # Use a variety of cases here.
     scores = []
-    for discrete_indices in [None, [0], [1], [2], [2, 0], [2, 3],
+    for discrete_indices in [-1, [0], [1], [2], [2, 0], [2, 3],
                              [0, 2], [0, 1, 2, 3]]:
-        scores.append(_cross_entropy_or_discrete_check(
-            discrete_indices=discrete_indices))
+        scores.append(_check_ae(
+            1.5,
+            n_epochs=1000,
+            disc_inds=range(4),
+            metric='cross-entropy',
+            disc_inds_to_use=discrete_indices))
 
     # All scores should be equal.
     for score in scores:
         assert_almost_equal(score, scores[0])
 
 
-def _cat_mse_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for two of four columns.
-    cat_cols = []
-    cat_size = []
-    for i in range(2, X.shape[1]):
-        # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i * np.arange(i+1) + 25.0
-        bins = ([0.0] +
-                list(np.percentile(X[:, i], nmid)) +
-                [1.1])
-        oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform(
-            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-        cat_size.append(col.shape[1])
-        cat_cols.append(col)
-
-    X = np.hstack([X[:, 0:2]] + cat_cols)
-
-    cat_begin = list(2 + np.array([0] + list(np.cumsum(cat_size)[:-1])))
-
-    ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=5000,
-                     random_state=4556,
-                     learning_rate=learning_rate,
-                     dropout=dropout,
-                     metric='mse',
-                     categorical_begin=cat_begin,
-                     categorical_size=cat_size)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    for begin, size in zip(cat_begin, cat_size):
-        assert_array_almost_equal(
-            np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
-
-    score = np.mean(softmax_cross_entropy(X[:, 2:], Xdec[:, 2:]) +
-                    np.sum((X[:, 0:2] - Xdec[:, 0:2]) ** 2, axis=1))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 3.5, ("Autoencoder should have a categorical + MSE "
-                            "metric less than 3.5 for the iris features.")
-
-    return ae_score
-
-
-def test_cat_mse_single_hidden_unit():
-    """Test categorical + MSE metric w/ a single hidden unit."""
-    _cat_mse_check(hidden_units=(1,))
-
-
-def test_cat_mse_multiple_hidden_units():
-    """Test categorical + MSE metric w/ 2 hidden units."""
-    _cat_mse_check(hidden_units=(2,))
-
-
-def test_cat_mse_multiple_layers():
-    """Test categorical + MSE metric w/ layers (3, 2)."""
-    _cat_mse_check(hidden_units=(3, 2,))
-
-
-def test_cat_mse_dropout():
-    """Test categorical + MSE metric w/ dropout."""
-    ae_score_dropout \
-        = _cat_mse_check(hidden_units=(20, 20, 10, 10, 2),
-                         dropout=0.01,
-                         learning_rate=1e-4)
-
-    ae_score_nodropout \
-        = _cat_mse_check(hidden_units=(20, 20, 10, 10, 2),
-                         dropout=0.0,
-                         learning_rate=1e-4)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Categorical + MSE metric with dropout should be more than "
-        "categorical + MSE metric with no dropout!")
-
-
-def _cat_cross_entropy_check(hidden_units=(1,),
-                             dropout=0.0,
-                             learning_rate=1e-1,
-                             use_discrete_indices=False):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for the columns.
-    # Use both 0,1 columns and one-hot encoded columns.
-    for i in range(0, 2):
-        bins = [0.0, np.median(X[:, i]), 1.1]
-        X[:, i] = np.digitize(X[:, i], bins) - 1.0
-
-    cat_cols = []
-    cat_size = []
-    for i in range(2, X.shape[1]):
-        # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i * np.arange(i+1) + 25.0
-        bins = ([0.0] +
-                list(np.percentile(X[:, i], nmid)) +
-                [1.1])
-        oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform(
-            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-        cat_size.append(col.shape[1])
-        cat_cols.append(col)
-
-    X = np.hstack([X[:, 0:2]] + cat_cols)
-
-    cat_begin = list(2 + np.array([0] + list(np.cumsum(cat_size)[:-1])))
-
-    if use_discrete_indices:
-        ae = Autoencoder(hidden_units=hidden_units,
-                         n_epochs=5000,
-                         random_state=4556,
-                         learning_rate=learning_rate,
-                         dropout=dropout,
-                         metric='mse',
-                         discrete_indices=[0, 1],
-                         categorical_begin=cat_begin,
-                         categorical_size=cat_size)
-    else:
-        ae = Autoencoder(hidden_units=hidden_units,
-                         n_epochs=5000,
-                         random_state=4556,
-                         learning_rate=learning_rate,
-                         dropout=dropout,
-                         metric='cross-entropy',
-                         categorical_begin=cat_begin,
-                         categorical_size=cat_size)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    for begin, size in zip(cat_begin, cat_size):
-        assert_array_almost_equal(
-            np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
-
-    score = np.mean(softmax_cross_entropy(X[:, 2:], Xdec[:, 2:]) +
-                    sigmoid_cross_entropy(X[:, :2], Xdec[:, :2]))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 4.5, ("Autoencoder should have a categorical + "
-                            "cross-entropy metric less than 4.5 for the "
-                            "iris features.")
-
-    return ae_score
-
-
-def test_cat_cross_entropy_single_hidden_unit():
-    """Test categorical + cross-entropy metric w/ a single hidden unit."""
-    score_false = _cat_cross_entropy_check(
-        hidden_units=(1,), use_discrete_indices=False)
-    score_true = _cat_cross_entropy_check(
-        hidden_units=(1,), use_discrete_indices=True)
-    assert_almost_equal(score_false, score_true)
-
-
-def test_cat_cross_entropy_multiple_hidden_units():
-    """Test categorical + cross-entropy metric w/ 2 hidden units."""
-    score_false = _cat_cross_entropy_check(
-        hidden_units=(2,), use_discrete_indices=False)
-    score_true = _cat_cross_entropy_check(
-        hidden_units=(2,), use_discrete_indices=True)
-    assert_almost_equal(score_false, score_true)
-
-
-def test_cat_cross_entropy_multiple_layers():
-    """Test categorical + cross-entropy metric w/ layers (3, 2)."""
-    score_false = _cat_cross_entropy_check(
-        hidden_units=(3, 2,), use_discrete_indices=False)
-    score_true = _cat_cross_entropy_check(
-        hidden_units=(3, 2,), use_discrete_indices=True)
-    assert_almost_equal(score_false, score_true)
-
-
-def test_cat_cross_entropy_dropout():
-    """Test categorical + cross-entropy metric w/ dropout."""
-    dropout_scores = []
-    nodropout_scores = []
-    for udi in [False, True]:
-        ae_score_dropout = _cat_cross_entropy_check(
-            hidden_units=(20, 20, 10, 10, 2),
-            dropout=0.01,
-            learning_rate=1e-4,
-            use_discrete_indices=udi)
-        dropout_scores.append(ae_score_dropout)
-
-        ae_score_nodropout = _cat_cross_entropy_check(
-            hidden_units=(20, 20, 10, 10, 2),
-            dropout=0.0,
-            learning_rate=1e-4,
-            use_discrete_indices=udi)
-        nodropout_scores.append(ae_score_nodropout)
-
-        assert ae_score_nodropout < ae_score_dropout, (
-            "Categorical + cross-entropy metric with dropout should be more "
-            "than categorical + cross-entropy metric with no dropout!")
-
-    assert_almost_equal(dropout_scores[0], dropout_scores[1])
-    assert_almost_equal(nodropout_scores[0], nodropout_scores[1])
-
-
-def _cat_cross_entropy_mse_check(hidden_units=(1,),
-                                 dropout=0.0,
-                                 learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for the columns.
-    for i in range(0, 1):
-        bins = [0.0, np.median(X[:, i]), 1.1]
-        X[:, i] = np.digitize(X[:, i], bins) - 1.0
-
-    cat_cols = []
-    cat_size = []
-    for i in range(2, X.shape[1]):
-        # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / i * np.arange(i+1) + 25.0
-        bins = ([0.0] +
-                list(np.percentile(X[:, i], nmid)) +
-                [1.1])
-        oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform(
-            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-        cat_size.append(col.shape[1])
-        cat_cols.append(col)
-
-    X = np.hstack([X[:, 0:2]] + cat_cols)
-
-    cat_begin = list(2 + np.array([0] + list(np.cumsum(cat_size)[:-1])))
-
-    ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=5000,
-                     random_state=4556,
-                     learning_rate=learning_rate,
-                     dropout=dropout,
-                     metric='mse',
-                     discrete_indices=[0],
-                     categorical_begin=cat_begin,
-                     categorical_size=cat_size)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    for begin, size in zip(cat_begin, cat_size):
-        assert_array_almost_equal(
-            np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
-
-    score = np.mean(softmax_cross_entropy(X[:, 2:], Xdec[:, 2:]) +
-                    sigmoid_cross_entropy(X[:, 0:1], Xdec[:, 0:1]) +
-                    np.sum((X[:, 1:2] - Xdec[:, 1:2]) ** 2, axis=1))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 4.5, ("Autoencoder should have a categorical + "
-                            "cross-entropy + MSE metric less than 4.5 for "
-                            "the iris features.")
-
-    return ae_score
-
-
-def test_cat_cross_entropy_mse_single_hidden_unit():
-    """Test categorical + cross-entropy + MSE metric w/ a single
-    hidden unit."""
-    _cat_cross_entropy_mse_check(hidden_units=(1,))
-
-
-def test_cat_cross_entropy_mse_multiple_hidden_units():
-    """Test categorical + cross-entropy + MSE metric w/ 2 hidden units."""
-    _cat_cross_entropy_mse_check(hidden_units=(2,))
-
-
-def test_cat_cross_entropy_mse_multiple_layers():
-    """Test categorical + cross-entropy + MSE metric w/ layers (3, 2)."""
-    _cat_cross_entropy_mse_check(hidden_units=(3, 2,))
-
-
-def test_cat_cross_entropy_mse_dropout():
-    """Test categorical + cross-entropy + MSE metric w/ dropout."""
-
-    ae_score_dropout = _cat_cross_entropy_mse_check(
-        hidden_units=(20, 20, 10, 10, 2),
-        dropout=0.01,
-        learning_rate=1e-4)
-
-    ae_score_nodropout = _cat_cross_entropy_mse_check(
-        hidden_units=(20, 20, 10, 10, 2),
-        dropout=0.0,
-        learning_rate=1e-4)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Categorical + cross-entropy + MSE metric with dropout should be "
-        "more than categorical + cross-entropy + MSE metric with no dropout!")
-
-
-def _cat_check(hidden_units=(1,), dropout=0.0, learning_rate=1e-1):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for two of four columns.
-    cat_cols = []
-    cat_size = []
-    for i in range(X.shape[1]):
-        # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / (i + 5) * np.arange(i + 6) + 25.0
-        bins = ([0.0] +
-                list(np.percentile(X[:, i], nmid)) +
-                [1.1])
-        oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform(
-            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-        cat_size.append(col.shape[1])
-        cat_cols.append(col)
-
-    X = np.hstack(cat_cols)
-
-    cat_begin = list(np.array([0] + list(np.cumsum(cat_size)[:-1])))
-
-    ae = Autoencoder(hidden_units=hidden_units,
-                     n_epochs=5000,
-                     random_state=4556,
-                     learning_rate=learning_rate,
-                     dropout=dropout,
-                     metric='mse',
-                     categorical_begin=cat_begin,
-                     categorical_size=cat_size)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], hidden_units[-1]), ("Encoded iris data "
-                                                          "is not the right"
-                                                          " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    for begin, size in zip(cat_begin, cat_size):
-        assert_array_almost_equal(
-            np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
-
-    score = np.mean(softmax_cross_entropy(X, Xdec))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae hidden_units, dropout, score: %s, %g, %g",
-                    pprint.pformat(hidden_units), dropout, ae_score)
-
-    assert ae_score < 8.5, ("Autoencoder should have a categorical "
-                            "metric less than 8.5 for the iris features.")
-
-    return ae_score
+CAT_MAX_SCORE = 8.5
 
 
 def test_cat_single_hidden_unit():
     """Test categorical metric w/ a single hidden unit."""
-    _cat_check(hidden_units=(1,))
+    _check_ae(CAT_MAX_SCORE, hidden_units=(1,), cat_inds=range(4))
 
 
 def test_cat_multiple_hidden_units():
     """Test categorical metric w/ 2 hidden units."""
-    _cat_check(hidden_units=(2,))
+    _check_ae(CAT_MAX_SCORE, hidden_units=(2,), cat_inds=range(4))
 
 
 def test_cat_multiple_layers():
     """Test categorical metric w/ layers (3, 2)."""
-    _cat_check(hidden_units=(3, 2,))
+    _check_ae(CAT_MAX_SCORE, hidden_units=(3, 2), cat_inds=range(4))
 
 
 def test_cat_dropout():
     """Test categorical metric w/ dropout."""
     ae_score_dropout \
-        = _cat_check(hidden_units=(20, 20, 10, 10, 2),
-                     dropout=0.01,
-                     learning_rate=1e-4)
+        = _check_ae(CAT_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    cat_inds=range(4),
+                    dropout=0.01,
+                    learning_rate=1e-4)
 
     ae_score_nodropout \
-        = _cat_check(hidden_units=(20, 20, 10, 10, 2),
-                     dropout=0.0,
-                     learning_rate=1e-4)
+        = _check_ae(CAT_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    cat_inds=range(4),
+                    dropout=0.0,
+                    learning_rate=1e-4)
 
     assert ae_score_nodropout < ae_score_dropout, (
         "Categorical metric with dropout should be more than "
         "categorical metric with no dropout!")
 
 
-def _cat_sparse_check(sparse_type=None):
-    X = iris.data  # Use the iris features.
-    X = MinMaxScaler().fit_transform(X)
-
-    # Use digitize to make a discrete problem for two of four columns.
-    cat_cols = []
-    cat_size = []
-    for i in range(X.shape[1]):
-        # Vary the number of categories to shake out bugs.
-        nmid = 50.0 / (i + 5) * np.arange(i + 6) + 25.0
-        bins = ([0.0] +
-                list(np.percentile(X[:, i], nmid)) +
-                [1.1])
-        oe = OneHotEncoder(sparse=False)
-        col = oe.fit_transform(
-            (np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-        cat_size.append(col.shape[1])
-        cat_cols.append(col)
-
-    X = np.hstack(cat_cols)
-
-    cat_begin = list(np.array([0] + list(np.cumsum(cat_size)[:-1])))
-
-    # Convert to a sparse format.
-    if sparse_type is not None:
-        X = getattr(sp, sparse_type + '_matrix')(X)
-
-    ae = Autoencoder(hidden_units=(1,),
-                     n_epochs=1000,
-                     random_state=4556,
-                     learning_rate=1e-1,
-                     dropout=0.0,
-                     metric='mse',
-                     categorical_begin=cat_begin,
-                     categorical_size=cat_size)
-    Xenc = ae.fit_transform(X)
-    Xdec = ae.inverse_transform(Xenc)
-
-    assert Xenc.shape == (X.shape[0], 1), ("Encoded iris data "
-                                           "is not the right"
-                                           " shape!")
-
-    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                   "shape!")
-
-    for begin, size in zip(cat_begin, cat_size):
-        assert_array_almost_equal(
-            np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
-
-    score = np.mean(softmax_cross_entropy(X.todense().A, Xdec))
-    ae_score = ae.score(X)
-    assert_almost_equal(score, ae_score, decimal=5)
-
-    _LOGGER.warning("ae sparse format, score: %s, %g",
-                    sparse_type, ae_score)
-
-    assert ae_score < 5.0, ("Autoencoder should have a categorical "
-                            "metric less than 5.0s for the iris features.")
-
-    return ae_score
-
-
 def test_sparse_inputs():
     """Make sure sparse inputs work properly."""
     scores = []
     for sparse_type in [None, 'csr', 'bsr', 'coo', 'csc', 'dok', 'lil']:
-        scores.append(_cat_sparse_check(sparse_type=sparse_type))
+        scores.append(_check_ae(
+            5.0, sparse_type=sparse_type, cat_inds=range(4), n_epochs=1000))
 
     # All scores should be equal.
     for score in scores:
         assert_almost_equal(score, scores[0])
+
+
+CE_MSE_MAX_SCORE = 0.2
+
+
+def test_cross_entropy_mse_single_hidden_unit():
+    """Test cross-entropy + MSE metric w/ a single hidden unit."""
+    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(1,), disc_inds=[2, 3])
+
+
+def test_cross_entropy_mse_multiple_hidden_units():
+    """Test the cross-entropy + MSE metric w/ 2 hidden units."""
+    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(2,), disc_inds=[2, 3])
+
+
+def test_cross_entropy_mse_multiple_layers():
+    """Test cross-entropy + MSE metric w/ layers (3, 2)."""
+    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(3, 2), disc_inds=[2, 3])
+
+
+def test_cross_entropy_mse_dropout():
+    """Test cross-entropy + MSE metric w/ dropout."""
+    ae_score_dropout \
+        = _check_ae(CE_MSE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    dropout=0.01,
+                    learning_rate=1e-3,
+                    disc_inds=[2, 3])
+
+    ae_score_nodropout \
+        = _check_ae(CE_MSE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    dropout=0.0,
+                    learning_rate=1e-3,
+                    disc_inds=[2, 3])
+
+    assert ae_score_nodropout < ae_score_dropout, (
+        "Cross-entropy + MSE metric with dropout should be more than "
+        "cross-entropy + MSE metric with no dropout!")
+
+
+CAT_MSE_MAX_SCORE = 3.5
+
+
+def test_cat_mse_single_hidden_unit():
+    """Test categorical + MSE metric w/ a single hidden unit."""
+    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(1,), cat_inds=[2, 3])
+
+
+def test_cat_mse_multiple_hidden_units():
+    """Test categorical + MSE metric w/ 2 hidden units."""
+    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(2,), cat_inds=[2, 3])
+
+
+def test_cat_mse_multiple_layers():
+    """Test categorical + MSE metric w/ layers (3, 2)."""
+    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(3, 2), cat_inds=[2, 3])
+
+
+def test_cat_mse_dropout():
+    """Test categorical + MSE metric w/ dropout."""
+    ae_score_dropout \
+        = _check_ae(CAT_MSE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    dropout=0.01,
+                    learning_rate=1e-4,
+                    cat_inds=[2, 3])
+
+    ae_score_nodropout \
+        = _check_ae(CAT_MSE_MAX_SCORE,
+                    hidden_units=(20, 20, 10, 10, 2),
+                    dropout=0.0,
+                    learning_rate=1e-4,
+                    cat_inds=[2, 3])
+
+    assert ae_score_nodropout < ae_score_dropout, (
+        "Categorical + MSE metric with dropout should be more than "
+        "categorical + MSE metric with no dropout!")
+
+
+CAT_CE_MAX_SCORE = 4.5
+
+
+def test_cat_cross_entropy_single_hidden_unit():
+    """Test categorical + cross-entropy metric w/ a single hidden unit."""
+    score_noinds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(1,),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        disc_inds_to_use=-1,
+        metric='cross-entropy')
+    score_inds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(1,),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        metric='mse')
+    assert_almost_equal(score_noinds, score_inds)
+
+
+def test_cat_cross_entropy_multiple_hidden_units():
+    """Test categorical + cross-entropy metric w/ 2 hidden units."""
+    score_noinds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(2,),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        disc_inds_to_use=-1,
+        metric='cross-entropy')
+    score_inds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(2,),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        metric='mse')
+    assert_almost_equal(score_noinds, score_inds)
+
+
+def test_cat_cross_entropy_multiple_layers():
+    """Test categorical + cross-entropy metric w/ layers (3, 2)."""
+    score_noinds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(3, 2),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        disc_inds_to_use=-1,
+        metric='cross-entropy')
+    score_inds = _check_ae(
+        CAT_CE_MAX_SCORE,
+        hidden_units=(3, 2),
+        cat_inds=[2, 3],
+        disc_inds=[0, 1],
+        metric='mse')
+    assert_almost_equal(score_noinds, score_inds)
+
+
+def test_cat_cross_entropy_dropout():
+    """Test categorical + cross-entropy metric w/ dropout."""
+    dropout_scores = []
+    nodropout_scores = []
+    for ditu in [-1, None]:
+        score_dropout = _check_ae(
+            CAT_CE_MAX_SCORE,
+            hidden_units=(20, 20, 10, 10, 2),
+            cat_inds=[2, 3],
+            disc_inds=[0, 1],
+            disc_inds_to_use=ditu,
+            metric='cross-entropy',
+            dropout=0.01,
+            learning_rate=1e-4)
+
+        score_nodropout = _check_ae(
+            CAT_CE_MAX_SCORE,
+            hidden_units=(20, 20, 10, 10, 2),
+            cat_inds=[2, 3],
+            disc_inds=[0, 1],
+            disc_inds_to_use=ditu,
+            metric='cross-entropy',
+            dropout=0.0,
+            learning_rate=1e-4)
+
+        assert score_nodropout < score_dropout, (
+            "Categorical + cross-entropy metric with dropout should be more "
+            "than categorical + cross-entropy metric with no dropout!")
+
+        dropout_scores.append(score_dropout)
+        nodropout_scores.append(score_nodropout)
+
+    assert_almost_equal(dropout_scores[0], dropout_scores[1])
+    assert_almost_equal(nodropout_scores[0], nodropout_scores[1])
+
+
+CAT_CE_MSE_MAX_SCORE = 4.5
+
+
+def test_cat_cross_entropy_mse_single_hidden_unit():
+    """Test categorical + cross-entropy + MSE metric w/ a single
+    hidden unit."""
+    _check_ae(CAT_CE_MSE_MAX_SCORE,
+              hidden_units=(1,),
+              cat_inds=[2, 3],
+              disc_inds=[0])
+
+
+def test_cat_cross_entropy_mse_multiple_hidden_units():
+    """Test categorical + cross-entropy + MSE metric w/ 2 hidden units."""
+    _check_ae(CAT_CE_MSE_MAX_SCORE,
+              hidden_units=(2,),
+              cat_inds=[2, 3],
+              disc_inds=[0])
+
+
+def test_cat_cross_entropy_mse_multiple_layers():
+    """Test categorical + cross-entropy + MSE metric w/ layers (3, 2)."""
+    _check_ae(CAT_CE_MSE_MAX_SCORE,
+              hidden_units=(3, 2),
+              cat_inds=[2, 3],
+              disc_inds=[0])
+
+
+def test_cat_cross_entropy_mse_dropout():
+    """Test categorical + cross-entropy + MSE metric w/ dropout."""
+
+    ae_score_dropout = _check_ae(
+        CAT_CE_MSE_MAX_SCORE,
+        hidden_units=(20, 20, 10, 10, 2),
+        cat_inds=[2, 3],
+        disc_inds=[0],
+        learning_rate=1e-4,
+        dropout=0.01)
+
+    ae_score_nodropout = _check_ae(
+        CAT_CE_MSE_MAX_SCORE,
+        hidden_units=(20, 20, 10, 10, 2),
+        cat_inds=[2, 3],
+        disc_inds=[0],
+        learning_rate=1e-4,
+        dropout=0.0)
+
+    assert ae_score_nodropout < ae_score_dropout, (
+        "Categorical + cross-entropy + MSE metric with dropout should be "
+        "more than categorical + cross-entropy + MSE metric with no dropout!")
