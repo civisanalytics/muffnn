@@ -324,54 +324,12 @@ def test_mse_dropout():
                                                    " dropout!")
 
 
-CE_MAX_SCORE = 3.0
-
-
 def test_cross_entropy_single_hidden_unit():
     """Test the cross-entropy metric w/ a single hidden unit."""
-    _check_ae(CE_MAX_SCORE,
+    _check_ae(1.2,
               hidden_units=(1,),
               disc_inds=range(4),
               metric='cross-entropy')
-
-
-def test_cross_entropy_multiple_hidden_units():
-    """Test the cross-entropy metric w/ 2 hidden units."""
-    _check_ae(CE_MAX_SCORE,
-              hidden_units=(2,),
-              disc_inds=range(4),
-              metric='cross-entropy')
-
-
-def test_cross_entropy_multiple_layers():
-    """Test the cross-entropy metric w/ layers (3, 2)."""
-    _check_ae(CE_MAX_SCORE,
-              hidden_units=(3, 2),
-              disc_inds=range(4),
-              metric='cross-entropy')
-
-
-def test_cross_entropy_dropout():
-    """Test the cross-entropy metric w/ dropout."""
-    ae_score_dropout \
-        = _check_ae(CE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    disc_inds=range(4),
-                    metric='cross-entropy',
-                    dropout=0.05,
-                    learning_rate=1e-4)
-
-    ae_score_nodropout \
-        = _check_ae(CE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    disc_inds=range(4),
-                    metric='cross-entropy',
-                    dropout=0.0,
-                    learning_rate=1e-4)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Cross-entropy with dropout should be more than cross-entropy "
-        "with no dropout!")
 
 
 def test_cross_entropy_or_discrete():
@@ -393,43 +351,9 @@ def test_cross_entropy_or_discrete():
         assert_almost_equal(score, scores[0])
 
 
-CAT_MAX_SCORE = 8.5
-
-
 def test_cat_single_hidden_unit():
     """Test categorical metric w/ a single hidden unit."""
-    _check_ae(CAT_MAX_SCORE, hidden_units=(1,), cat_inds=range(4))
-
-
-def test_cat_multiple_hidden_units():
-    """Test categorical metric w/ 2 hidden units."""
-    _check_ae(CAT_MAX_SCORE, hidden_units=(2,), cat_inds=range(4))
-
-
-def test_cat_multiple_layers():
-    """Test categorical metric w/ layers (3, 2)."""
-    _check_ae(CAT_MAX_SCORE, hidden_units=(3, 2), cat_inds=range(4))
-
-
-def test_cat_dropout():
-    """Test categorical metric w/ dropout."""
-    ae_score_dropout \
-        = _check_ae(CAT_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    cat_inds=range(4),
-                    dropout=0.01,
-                    learning_rate=1e-4)
-
-    ae_score_nodropout \
-        = _check_ae(CAT_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    cat_inds=range(4),
-                    dropout=0.0,
-                    learning_rate=1e-4)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Categorical metric with dropout should be more than "
-        "categorical metric with no dropout!")
+    _check_ae(3.0, hidden_units=(1,), cat_inds=range(4))
 
 
 def test_sparse_inputs():
@@ -437,96 +361,29 @@ def test_sparse_inputs():
     scores = []
     for sparse_type in [None, 'csr', 'bsr', 'coo', 'csc', 'dok', 'lil']:
         scores.append(_check_ae(
-            5.0, sparse_type=sparse_type, cat_inds=range(4), n_epochs=1000))
+            5.0,
+            sparse_type=sparse_type,
+            cat_inds=range(4),
+            n_epochs=1000))
 
     # All scores should be equal.
     for score in scores:
         assert_almost_equal(score, scores[0])
 
 
-CE_MSE_MAX_SCORE = 0.2
-
-
 def test_cross_entropy_mse_single_hidden_unit():
     """Test cross-entropy + MSE metric w/ a single hidden unit."""
-    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(1,), disc_inds=[2, 3])
-
-
-def test_cross_entropy_mse_multiple_hidden_units():
-    """Test the cross-entropy + MSE metric w/ 2 hidden units."""
-    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(2,), disc_inds=[2, 3])
-
-
-def test_cross_entropy_mse_multiple_layers():
-    """Test cross-entropy + MSE metric w/ layers (3, 2)."""
-    _check_ae(CE_MSE_MAX_SCORE, hidden_units=(3, 2), disc_inds=[2, 3])
-
-
-def test_cross_entropy_mse_dropout():
-    """Test cross-entropy + MSE metric w/ dropout."""
-    ae_score_dropout \
-        = _check_ae(CE_MSE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    dropout=0.01,
-                    learning_rate=1e-3,
-                    disc_inds=[2, 3])
-
-    ae_score_nodropout \
-        = _check_ae(CE_MSE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    dropout=0.0,
-                    learning_rate=1e-3,
-                    disc_inds=[2, 3])
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Cross-entropy + MSE metric with dropout should be more than "
-        "cross-entropy + MSE metric with no dropout!")
-
-
-CAT_MSE_MAX_SCORE = 3.5
+    _check_ae(0.2, hidden_units=(1,), disc_inds=[2, 3])
 
 
 def test_cat_mse_single_hidden_unit():
     """Test categorical + MSE metric w/ a single hidden unit."""
-    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(1,), cat_inds=[2, 3])
-
-
-def test_cat_mse_multiple_hidden_units():
-    """Test categorical + MSE metric w/ 2 hidden units."""
-    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(2,), cat_inds=[2, 3])
-
-
-def test_cat_mse_multiple_layers():
-    """Test categorical + MSE metric w/ layers (3, 2)."""
-    _check_ae(CAT_MSE_MAX_SCORE, hidden_units=(3, 2), cat_inds=[2, 3])
-
-
-def test_cat_mse_dropout():
-    """Test categorical + MSE metric w/ dropout."""
-    ae_score_dropout \
-        = _check_ae(CAT_MSE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    dropout=0.01,
-                    learning_rate=1e-4,
-                    cat_inds=[2, 3])
-
-    ae_score_nodropout \
-        = _check_ae(CAT_MSE_MAX_SCORE,
-                    hidden_units=(20, 20, 10, 10, 2),
-                    dropout=0.0,
-                    learning_rate=1e-4,
-                    cat_inds=[2, 3])
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Categorical + MSE metric with dropout should be more than "
-        "categorical + MSE metric with no dropout!")
-
-
-CAT_CE_MAX_SCORE = 4.5
+    _check_ae(1.1, hidden_units=(1,), cat_inds=[2, 3])
 
 
 def test_cat_cross_entropy_single_hidden_unit():
     """Test categorical + cross-entropy metric w/ a single hidden unit."""
+    CAT_CE_MAX_SCORE = 1.7
     score_noinds = _check_ae(
         CAT_CE_MAX_SCORE,
         hidden_units=(1,),
@@ -541,127 +398,12 @@ def test_cat_cross_entropy_single_hidden_unit():
         disc_inds=[0, 1],
         metric='mse')
     assert_almost_equal(score_noinds, score_inds)
-
-
-def test_cat_cross_entropy_multiple_hidden_units():
-    """Test categorical + cross-entropy metric w/ 2 hidden units."""
-    score_noinds = _check_ae(
-        CAT_CE_MAX_SCORE,
-        hidden_units=(2,),
-        cat_inds=[2, 3],
-        disc_inds=[0, 1],
-        disc_inds_to_use=-1,
-        metric='cross-entropy')
-    score_inds = _check_ae(
-        CAT_CE_MAX_SCORE,
-        hidden_units=(2,),
-        cat_inds=[2, 3],
-        disc_inds=[0, 1],
-        metric='mse')
-    assert_almost_equal(score_noinds, score_inds)
-
-
-def test_cat_cross_entropy_multiple_layers():
-    """Test categorical + cross-entropy metric w/ layers (3, 2)."""
-    score_noinds = _check_ae(
-        CAT_CE_MAX_SCORE,
-        hidden_units=(3, 2),
-        cat_inds=[2, 3],
-        disc_inds=[0, 1],
-        disc_inds_to_use=-1,
-        metric='cross-entropy')
-    score_inds = _check_ae(
-        CAT_CE_MAX_SCORE,
-        hidden_units=(3, 2),
-        cat_inds=[2, 3],
-        disc_inds=[0, 1],
-        metric='mse')
-    assert_almost_equal(score_noinds, score_inds)
-
-
-def test_cat_cross_entropy_dropout():
-    """Test categorical + cross-entropy metric w/ dropout."""
-    dropout_scores = []
-    nodropout_scores = []
-    for ditu in [-1, None]:
-        score_dropout = _check_ae(
-            CAT_CE_MAX_SCORE,
-            hidden_units=(20, 20, 10, 10, 2),
-            cat_inds=[2, 3],
-            disc_inds=[0, 1],
-            disc_inds_to_use=ditu,
-            metric='cross-entropy',
-            dropout=0.01,
-            learning_rate=1e-4)
-
-        score_nodropout = _check_ae(
-            CAT_CE_MAX_SCORE,
-            hidden_units=(20, 20, 10, 10, 2),
-            cat_inds=[2, 3],
-            disc_inds=[0, 1],
-            disc_inds_to_use=ditu,
-            metric='cross-entropy',
-            dropout=0.0,
-            learning_rate=1e-4)
-
-        assert score_nodropout < score_dropout, (
-            "Categorical + cross-entropy metric with dropout should be more "
-            "than categorical + cross-entropy metric with no dropout!")
-
-        dropout_scores.append(score_dropout)
-        nodropout_scores.append(score_nodropout)
-
-    assert_almost_equal(dropout_scores[0], dropout_scores[1])
-    assert_almost_equal(nodropout_scores[0], nodropout_scores[1])
-
-
-CAT_CE_MSE_MAX_SCORE = 4.5
 
 
 def test_cat_cross_entropy_mse_single_hidden_unit():
     """Test categorical + cross-entropy + MSE metric w/ a single
     hidden unit."""
-    _check_ae(CAT_CE_MSE_MAX_SCORE,
+    _check_ae(1.0,
               hidden_units=(1,),
               cat_inds=[2, 3],
               disc_inds=[0])
-
-
-def test_cat_cross_entropy_mse_multiple_hidden_units():
-    """Test categorical + cross-entropy + MSE metric w/ 2 hidden units."""
-    _check_ae(CAT_CE_MSE_MAX_SCORE,
-              hidden_units=(2,),
-              cat_inds=[2, 3],
-              disc_inds=[0])
-
-
-def test_cat_cross_entropy_mse_multiple_layers():
-    """Test categorical + cross-entropy + MSE metric w/ layers (3, 2)."""
-    _check_ae(CAT_CE_MSE_MAX_SCORE,
-              hidden_units=(3, 2),
-              cat_inds=[2, 3],
-              disc_inds=[0])
-
-
-def test_cat_cross_entropy_mse_dropout():
-    """Test categorical + cross-entropy + MSE metric w/ dropout."""
-
-    ae_score_dropout = _check_ae(
-        CAT_CE_MSE_MAX_SCORE,
-        hidden_units=(20, 20, 10, 10, 2),
-        cat_inds=[2, 3],
-        disc_inds=[0],
-        learning_rate=1e-4,
-        dropout=0.01)
-
-    ae_score_nodropout = _check_ae(
-        CAT_CE_MSE_MAX_SCORE,
-        hidden_units=(20, 20, 10, 10, 2),
-        cat_inds=[2, 3],
-        disc_inds=[0],
-        learning_rate=1e-4,
-        dropout=0.0)
-
-    assert ae_score_nodropout < ae_score_dropout, (
-        "Categorical + cross-entropy + MSE metric with dropout should be "
-        "more than categorical + cross-entropy + MSE metric with no dropout!")
