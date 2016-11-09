@@ -7,9 +7,11 @@ import pprint
 from io import BytesIO
 import pickle
 
+import pytest
 import numpy as np
 import scipy.special
 import scipy.sparse as sp
+import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.datasets import load_iris
 from sklearn.utils.estimator_checks import check_estimator
@@ -139,7 +141,7 @@ def test_refitting():
     X = iris.data  # Use the iris features.
     X = MinMaxScaler().fit_transform(X)
 
-    # Use digitize to make a discrete problem.
+    # Use digitize to make a binary features.
     for i in range(X.shape[1]):
         bins = [0.0, np.median(X[:, i]), 1.1]
         X[:, i] = np.digitize(X[:, i], bins) - 1.0
@@ -161,13 +163,68 @@ def test_refitting():
                                      "Autoencoder!")
 
 
+def test_errors_unallowed_metric():
+    """Make sure unallowed metrics cause an error."""
+
+    # This data will not actually be fit.
+    # I am just using it to call the `fit` method.
+    X = np.ones((1000, 4))
+
+    # There are two code paths for this test. One for all features
+    # using the default metric and one for a mix of metrics.
+
+    # All features use the default metric.
+    ae = Autoencoder(metric='blah')
+    with pytest.raises(ValueError) as e:
+        ae.fit(X)
+        assert "Metric 'blah'" in str(e), (
+            "Wrong error raised for testing unallowed metrics!")
+
+    # All features use the default metric.
+    ae = Autoencoder(metric='blah', binary_indices=[0])
+    with pytest.raises(ValueError) as e:
+        ae.fit(X)
+        assert "Metric 'blah'" in str(e), (
+            "Wrong error raised for testing unallowed metrics!")
+
+
+def test_errors_metric_output_activation():
+    """Make sure cross-entropy metric with activations not equal to
+    `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` fails."""
+
+    # This data will not actually be fit.
+    # I am just using it to call the `fit` method.
+    X = np.ones((1000, 4))
+
+    # There are two code paths for this test. One for all features
+    # using the default metric and one for a mix of metrics.
+
+    # All features use the default metric.
+    ae = Autoencoder(metric='cross-entropy', output_activation=tf.exp)
+    with pytest.raises(ValueError) as e:
+        ae.fit(X)
+        assert "'cross-entropy' metric!" in str(e), (
+            "Wrong error raised for testing 'cross-entropy' metric with "
+            "output activation that is not allowed for all features!")
+
+    # All features use the default metric.
+    ae = Autoencoder(metric='cross-entropy',
+                     output_activation=tf.exp,
+                     binary_indices=[0])
+    with pytest.raises(ValueError) as e:
+        ae.fit(X)
+        assert "'cross-entropy' metric!" in str(e), (
+            "Wrong error raised for testing 'cross-entropy' metric with "
+            "output activation that is not allowed for a subset of features!")
+
+
 def _check_ae(max_score,
               hidden_units=(1,),
               dropout=0.0,
               learning_rate=1e-1,
               sparse_type=None,
-              disc_inds=None,
-              disc_inds_to_use=None,
+              bin_inds=None,
+              bin_inds_to_use=None,
               cat_inds=None,
               n_epochs=5000,
               metric='mse'):
@@ -175,18 +232,18 @@ def _check_ae(max_score,
     X = iris.data
     X = MinMaxScaler().fit_transform(X)
 
-    # Make some columns discrete or one-hot encoded.
+    # Make some columns binary or one-hot encoded.
     cat_size = []
     cat_begin = []
-    dis_inds = []
+    binary_inds = []
     keep_cols = []
     def_inds = []
     num_cols = 0
     for i in range(X.shape[1]):
-        if disc_inds is not None and i in disc_inds:
+        if bin_inds is not None and i in bin_inds:
             bins = [0.0, np.median(X[:, i]), 1.1]
             keep_cols.append((np.digitize(X[:, i], bins) - 1.0)[:, np.newaxis])
-            dis_inds.append(num_cols)
+            binary_inds.append(num_cols)
             num_cols += 1
         elif cat_inds is not None and i in cat_inds:
             # Vary the number of categories to shake out bugs.
@@ -208,21 +265,25 @@ def _check_ae(max_score,
     X = np.hstack(keep_cols)
 
     if len(cat_size) == 0:
-        cat_size = None
-        cat_begin = None
+        cat_indices = None
+    else:
+        cat_indices = np.hstack([np.array(cat_begin)[:, np.newaxis],
+                                 np.array(cat_size)[:, np.newaxis]])
+        assert cat_indices.shape[1] == 2, ("Categorical indices are the "
+                                           "wrong shape!")
 
-    if len(dis_inds) == 0:
-        dis_inds = None
+    if len(binary_inds) == 0:
+        binary_inds = None
 
     if sparse_type is not None:
         X = getattr(sp, sparse_type + '_matrix')(X)
 
-    # For sigmoid metric runs, we can set the metric or use discrete_indices.
+    # For sigmoid metric runs, we can set the metric or use binary_indices.
     # This if handles those cases.
-    if disc_inds_to_use is None and dis_inds is not None:
-        disc_inds_to_use = dis_inds
-    elif disc_inds_to_use == -1:
-        disc_inds_to_use = None
+    if bin_inds_to_use is None and binary_inds is not None:
+        bin_inds_to_use = binary_inds
+    elif bin_inds_to_use == -1:
+        bin_inds_to_use = None
 
     ae = Autoencoder(hidden_units=hidden_units,
                      n_epochs=n_epochs,
@@ -230,9 +291,8 @@ def _check_ae(max_score,
                      learning_rate=learning_rate,
                      dropout=dropout,
                      metric=metric,
-                     discrete_indices=disc_inds_to_use,
-                     categorical_begin=cat_begin,
-                     categorical_size=cat_size)
+                     binary_indices=bin_inds_to_use,
+                     categorical_indices=cat_indices)
 
     Xenc = ae.fit_transform(X)
     Xdec = ae.inverse_transform(Xenc)
@@ -256,7 +316,7 @@ def _check_ae(max_score,
     # Compute and test the scores.
     scores = 0.0
     for i in range(X.shape[1]):
-        if dis_inds is not None and i in dis_inds:
+        if binary_inds is not None and i in binary_inds:
             scores += sigmoid_cross_entropy(X[:, i:i+1], Xdec[:, i:i+1])
         elif cat_size is not None and i in cat_begin:
             ind = cat_begin.index(i)
@@ -324,27 +384,97 @@ def test_mse_dropout():
                                                    " dropout!")
 
 
+def test_cross_entropy_softmax_single_unit():
+    """Test the cross-entropy metric w/ softmax and a single hidden unit."""
+
+    # Use the iris features.
+    X = iris.data
+    X = MinMaxScaler().fit_transform(X)
+
+    # Make some columns normalized to unity.
+    X = X / np.sum(X, axis=1)[:, np.newaxis]
+
+    for i in range(2):
+        if i == 1:
+            bins = [0.0, np.median(X[:, 0]), 1.1]
+            X[:, 0] = np.digitize(X[:, 0], bins) - 1.0
+            X[:, 1:] = X[:, 1:] / np.sum(X[:, 1:], axis=1)[:, np.newaxis]
+            binary_indices = [0]
+        else:
+            binary_indices = None
+
+        ae = Autoencoder(hidden_units=(1,),
+                         n_epochs=5000,
+                         random_state=4556,
+                         learning_rate=1e-1,
+                         dropout=0.0,
+                         metric='cross-entropy',
+                         output_activation=tf.nn.softmax,
+                         binary_indices=binary_indices)
+
+        Xenc = ae.fit_transform(X)
+        Xdec = ae.inverse_transform(Xenc)
+
+        assert Xenc.shape == (X.shape[0], 1), ("Encoded iris data is not the "
+                                               "right shape!")
+
+        assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
+                                       "shape!")
+
+        if i == 1:
+            # Softmax stuff should come back out normalized.
+            assert_array_almost_equal(np.sum(Xdec[:, 1:], axis=1), 1.0)
+
+            # Compute and test the scores.
+            scores = softmax_cross_entropy(X[:, 1:], Xdec[:, 1:])
+            scores += sigmoid_cross_entropy(X[:, 0:1], Xdec[:, 0:1])
+
+            ae_scores = ae.score_samples(X)
+            assert_array_almost_equal(scores, ae_scores, decimal=5)
+        else:
+            # Softmax stuff should come back out normalized.
+            assert_array_almost_equal(np.sum(Xdec, axis=1), 1.0)
+
+            # Compute and test the scores.
+            scores = softmax_cross_entropy(X, Xdec)
+            ae_scores = ae.score_samples(X)
+            assert_array_almost_equal(scores, ae_scores, decimal=5)
+
+        score = np.mean(scores)
+        ae_score = ae.score(X)
+        assert_almost_equal(score, ae_score, decimal=5)
+
+        _LOGGER.warning("\ntest info:\n    ae: %s\n"
+                        "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
+                        str(ae), ae_score,
+                        pprint.pformat(list(X[10]), compact=True),
+                        pprint.pformat(list(Xdec[10]), compact=True))
+
+        assert ae_score < 2.5, ("Autoencoder should have a score "
+                                "less than 2.5 for the iris features.")
+
+
 def test_cross_entropy_single_hidden_unit():
     """Test the cross-entropy metric w/ a single hidden unit."""
     _check_ae(1.2,
               hidden_units=(1,),
-              disc_inds=range(4),
+              bin_inds=range(4),
               metric='cross-entropy')
 
 
-def test_cross_entropy_or_discrete():
-    """Test to make sure discrete indices or cross-entropy metric
+def test_cross_entropy_or_binary():
+    """Test to make sure binary indices or cross-entropy metric
     works in all cases."""
     # Use a variety of cases here.
     scores = []
-    for discrete_indices in [-1, [0], [1], [2], [2, 0], [2, 3],
-                             [0, 2], [0, 1, 2, 3]]:
+    for binary_indices in [-1, [0], [1], [2], [2, 0], [2, 3],
+                           [0, 2], [0, 1, 2, 3]]:
         scores.append(_check_ae(
             1.5,
             n_epochs=1000,
-            disc_inds=range(4),
+            bin_inds=range(4),
             metric='cross-entropy',
-            disc_inds_to_use=discrete_indices))
+            bin_inds_to_use=binary_indices))
 
     # All scores should be equal.
     for score in scores:
@@ -373,7 +503,7 @@ def test_sparse_inputs():
 
 def test_cross_entropy_mse_single_hidden_unit():
     """Test cross-entropy + MSE metric w/ a single hidden unit."""
-    _check_ae(0.2, hidden_units=(1,), disc_inds=[2, 3])
+    _check_ae(0.2, hidden_units=(1,), bin_inds=[2, 3])
 
 
 def test_cat_mse_single_hidden_unit():
@@ -388,14 +518,14 @@ def test_cat_cross_entropy_single_hidden_unit():
         CAT_CE_MAX_SCORE,
         hidden_units=(1,),
         cat_inds=[2, 3],
-        disc_inds=[0, 1],
-        disc_inds_to_use=-1,
+        bin_inds=[0, 1],
+        bin_inds_to_use=-1,
         metric='cross-entropy')
     score_inds = _check_ae(
         CAT_CE_MAX_SCORE,
         hidden_units=(1,),
         cat_inds=[2, 3],
-        disc_inds=[0, 1],
+        bin_inds=[0, 1],
         metric='mse')
     assert_almost_equal(score_noinds, score_inds)
 
@@ -406,4 +536,4 @@ def test_cat_cross_entropy_mse_single_hidden_unit():
     _check_ae(1.0,
               hidden_units=(1,),
               cat_inds=[2, 3],
-              disc_inds=[0])
+              bin_inds=[0])
