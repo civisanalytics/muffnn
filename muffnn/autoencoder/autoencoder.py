@@ -214,8 +214,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         """Add ops for output layer and scores to the graph."""
         scores = 0.0
 
-        # Below a transpose on `t` is needed if the TF ops `scatter_update` or
-        # `gather` are used on the features dimension of `t` (i.e., dim 2).
+        # Below a transpose on `t` is needed if the TF op `gather` is used
+        # on the features dimension of `t` (i.e., dim 2).
         # A shortcut has been added here to avoid a transpose if it is not
         # needed.
         if (self.categorical_begin_ is None and
@@ -237,7 +237,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             else:
                 raise ValueError('Metric "%s" is not allowed!' % self.metric)
         else:
-            # The transpose since gather and scatter work on first dim.
+            # Use the transpose since gather works on first dim.
             t = tf.transpose(t)
 
             # Categorical vars w/ one-hot encoding.
@@ -310,7 +310,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     raise ValueError('Metric "%s" is not allowed!' %
                                      self.metric)
 
-            # Undo the transpose here. Scores are transposed too.
+            # Undo the transpose here.
             t = tf.transpose(t)
 
         return t, scores
