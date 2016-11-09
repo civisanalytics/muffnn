@@ -13,7 +13,7 @@ from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array, check_random_state
 from sklearn.utils.validation import NotFittedError
 
-from ..core import TFPicklingBase, affine
+from muffnn.core import TFPicklingBase, affine
 
 
 _LOGGER = logging.getLogger(__name__)

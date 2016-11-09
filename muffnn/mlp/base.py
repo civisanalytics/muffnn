@@ -25,7 +25,7 @@ import tensorflow as tf
 from tensorflow.python.framework.ops import Graph
 from tensorflow.python.framework import random_seed as tf_random_seed
 
-from ..core import TFPicklingBase, affine
+from muffnn.core import TFPicklingBase, affine
 
 
 _LOGGER = logging.getLogger(__name__)

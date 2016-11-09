@@ -15,8 +15,8 @@ from sklearn.utils.multiclass import type_of_target
 
 import tensorflow as tf
 from tensorflow.python.ops import nn
-from .base import MLPBaseEstimator
-from ..core import affine
+from muffnn.mlp.base import MLPBaseEstimator
+from muffnn.core import affine
 
 
 _LOGGER = logging.getLogger(__name__)
