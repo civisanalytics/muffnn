@@ -30,9 +30,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         sizes. The list is reflected about the last element to form the
         autoencoder. For example, if hidden_units is (256, 32, 16) then
         the autoencoder has layers
-
-            [input_layer, 256, 32, 16, 32, 256, input_layer]
-
+        [input_layer_size, 256, 32, 16, 32, 256, input_layer_size].
     batch_size : int, optional
         The batch size for learning and prediction. If there are fewer
         examples than the batch size during fitting, then the the number of
@@ -43,11 +41,11 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     dropout : float or None, optional
         The dropout probability. If None, then dropout will not be used.
         Note that dropout is not applied to the input layer.
-    activation : (callable, callable), optional
-        The activation functions for
-
-            (the bulk of the autoencoder and encoding layer, output layer).
-
+    hidden_activation : callable, optional
+        The activation function for the hidden layers and encoding layer.
+        See `tensorflow.nn` for various options.
+    output_activation : callable, optional
+        The activation function for the output layer.
         See `tensorflow.nn` for various options.
     random_state: int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
@@ -57,33 +55,22 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         Learning rate for Adam.
     metric : string, optional
         Default metric for the autoencoder. Options are
-
             'mse' - mean square error
             'cross-entropy' - cross-entropy
-
-        Note that the 'cross-entropy' metric forces the activation of the
-        output layer to be tensorflow.nn.sigmoid. Any dimensions indicated by
-        the options `categorical_begin`, `categorical_size` or
-        `discrete_indices` use a cross-entropy metric with
-        `tensorflow.nn.softmax` or `tensorflow.nn.sigmoid` output layer
-        activations.
-    discrete_indices : array-like, 1d, optional
+        Note that this will be overridden for columns specified by
+        `binary_indices` or `categorical_indices`
+    binary_indices : array-like, shape (n_binary,), optional
         Array of indices for which `tf.nn.sigmoid` will be used for the
-        output layer activation and the cross-entropy will be used as the
-        metric for the autoencoder.
-    categorical_begin : array-like, shape (n_categorial), optional
-        Array of the start of the one-hot encoded values for any
-        categorically expanded variables. This forces the output layer to have
-        activation `tensorflow.nn.softmax` for these variables and
-        cross-entropy for metric for these variables.
-        You must specify both `categorical_begin` and `categorical_size` if
-        either is specified.
-    categorical_size : array-like, shape (n_categorial), optional
-        Array of the number of categories for any categorically expanded
-        variables. This forces the output layer to have activation
-        `tensorflow.nn.softmax` for these variables and cross-entropy for
-        metric for these variables. You must specify both `categorical_begin`
-        and `categorical_size` if either is specified.
+        output layer activation and cross-entropy will be used in the loss
+        function.
+    categorical_indices : array-like, shape (n_categorical, 2), optional
+        An array where each row specifies a range of indices for a categorical
+        variable that has been expanded to multiple indices (e.g.,
+        one-hot encoded).
+        The first column contains start indices. The second column contains
+        lengths. For each range of indices, the output layer will use
+        `tensorflow.nn.softmax` activation and the loss function will use
+        cross-entropy.
 
     Attributes
     ----------
@@ -91,12 +78,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         The TensorFlow graph for the model.
     input_layer_sz_ : int
         The dimensionality of the input (i.e., number of features).
-    discrete_indices_ : array-like, 1d or None
+    binary_indices_ : array-like, 1d or None
         Indices at which sigmoid activations were used, if any.
-    categorical_begin_ : array-like, 1d or None
-        Starting locations of one-hot encoded variables, if any.
-    categorical_size_ : array-like, 1d or None
-        Sizes of one-hot encoding of variables, if any.
+    categorical_indices_ : array-like, 2d or None
+        Starting locations and lengths of one-hot encoded variables, if any.
 
     Methods
     -------
@@ -579,6 +564,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         Note that transform and inverse_transform will in general not be exact
         inverses of each other for an autoencoder.
+
+        This method can be useful if further modeling on the encoded data
+        generates new encoded data vectors (e.g., generating new data by
+        fitting a density estimate to the encoded data).
 
         Parameters
         ----------
