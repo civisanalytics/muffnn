@@ -79,12 +79,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     ----------
     graph_ : tensorflow.python.framework.ops.Graph
         The TensorFlow graph for the model.
-    input_layer_sz_ : int
+    input_layer_size_ : int
         The dimensionality of the input (i.e., number of features).
-    binary_indices_ : array-like, 1d or None
-        Indices at which sigmoid activations were used, if any.
-    categorical_indices_ : array-like, 2d or None
-        Starting locations and lengths of one-hot encoded variables, if any.
 
     Methods
     -------
@@ -132,21 +128,21 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Input values.
         self._input_values = tf.placeholder(tf.float32,
-                                            [None, self.input_layer_sz_],
+                                            [None, self.input_layer_size_],
                                             "input_values")
         t = self._input_values
 
         self._default_msk = tf.placeholder(tf.float32,
-                                           [None, self.input_layer_sz_],
+                                           [None, self.input_layer_size_],
                                            "default_msk")
 
         self._binary_msk = tf.placeholder(tf.float32,
-                                          [None, self.input_layer_sz_],
+                                          [None, self.input_layer_size_],
                                           "binary_msk")
 
         self._categorical_msks = tf.placeholder(
             tf.float32,
-            [None, None, self.input_layer_sz_],
+            [None, None, self.input_layer_size_],
             "categorical_msks")
 
         # Fan in layers.
@@ -163,7 +159,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Fan out layers.
         second_layers \
-            = list(self.hidden_units[::-1][1:]) + [self.input_layer_sz_]
+            = list(self.hidden_units[::-1][1:]) + [self.input_layer_size_]
         for i, layer_sz in enumerate(second_layers):
             t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
             t = affine(t,
@@ -204,8 +200,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # on the features dimension of `t` (i.e., dim 2).
         # A shortcut has been added here to avoid a transpose if it is not
         # needed.
-        if (self.categorical_indices_ is None and
-                self.binary_indices_ is None):
+        if (self._categorical_indices is None and
+                self._binary_indices is None):
 
             if self.metric == 'mse':
                 if self.output_activation is not None:
@@ -238,12 +234,12 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             # Categorical vars w/ one-hot encoding.
             # Softmax all of the categorical stuff and use cross-entropy.
-            if self.categorical_indices_ is not None:
+            if self._categorical_indices is not None:
                 min_float32 = tf.constant(tf.float32.min)
                 for i, begin, size in zip(
-                        range(self.categorical_indices_.shape[0]),
-                        self.categorical_indices_[:, 0],
-                        self.categorical_indices_[:, 1]):
+                        range(self._categorical_indices.shape[0]),
+                        self._categorical_indices[:, 0],
+                        self._categorical_indices[:, 1]):
                     scores += tf.nn.softmax_cross_entropy_with_logits(
                         tf.slice(t, [begin, 0], [size, -1]),
                         tf.slice(tf.transpose(self._input_values),
@@ -266,10 +262,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             # Discrete 0/1 stuff.
             # Sigmoid output w/ cross-entropy.
-            if self.binary_indices_ is not None:
-                tsub = tf.gather(t, self.binary_indices_)
+            if self._binary_indices is not None:
+                tsub = tf.gather(t, self._binary_indices)
                 isub = tf.gather(tf.transpose(self._input_values),
-                                 self.binary_indices_)
+                                 self._binary_indices)
                 scores += tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
                     reduction_indices=[0])
@@ -368,7 +364,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         """
 
         if self._is_fitted:
-            if X.shape[1] != self.input_layer_sz_:
+            if X.shape[1] != self.input_layer_size_:
                 raise ValueError("Number of features in the input data does "
                                  "not match the number assumed by the "
                                  "estimator!")
@@ -393,9 +389,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Add fitted attributes if the model has been fitted.
         if self._is_fitted:
-            state['input_layer_sz_'] = self.input_layer_sz_
-            state['binary_indices_'] = self.binary_indices_
-            state['categorical_indices_'] = self.categorical_indices_
+            state['input_layer_size_'] = self.input_layer_size_
+            state['_binary_indices'] = self._binary_indices
+            state['_categorical_indices'] = self._categorical_indices
             state['_binary_msk_values'] = self._binary_msk_values
             state['_default_msk_values'] = self._default_msk_values
             state['_categorical_msks_values'] = self._categorical_msks_values
@@ -447,48 +443,48 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Initialize the model if it hasn't been already by a previous call.
         if not self._is_fitted:
-            self.input_layer_sz_ = X.shape[1]
+            self.input_layer_size_ = X.shape[1]
 
             # Indices for default metric, used for updates in metric.
             def_indices = set(range(X.shape[1]))
 
             # Check and set categorical and discrete indices.
-            self.binary_indices_ = (np.atleast_1d(self.binary_indices)
+            self._binary_indices = (np.atleast_1d(self.binary_indices)
                                     if self.binary_indices is not None
                                     else None)
 
             self._binary_msk_values \
-                = np.zeros((self.batch_size, self.input_layer_sz_))
-            if self.binary_indices_ is not None:
-                def_indices -= set(self.binary_indices_.tolist())
-                self._binary_msk_values[:, self.binary_indices_] = 1
+                = np.zeros((self.batch_size, self.input_layer_size_))
+            if self._binary_indices is not None:
+                def_indices -= set(self._binary_indices.tolist())
+                self._binary_msk_values[:, self._binary_indices] = 1
 
             if self.categorical_indices is not None:
-                self.categorical_indices_ \
+                self._categorical_indices \
                     = np.atleast_2d(self.categorical_indices)
 
                 self._categorical_msks_values = []
-                for begin, size in zip(self.categorical_indices_[:, 0],
-                                       self.categorical_indices_[:, 1]):
+                for begin, size in zip(self._categorical_indices[:, 0],
+                                       self._categorical_indices[:, 1]):
                     # Remove categorical stuff from def_indices.
                     def_indices -= set(range(begin, begin + size))
 
                     # Keep track of the mask.
-                    msk = np.zeros((self.batch_size, self.input_layer_sz_))
+                    msk = np.zeros((self.batch_size, self.input_layer_size_))
                     msk[:, range(begin, begin + size)] = 1
                     self._categorical_msks_values.append(msk)
 
                 self._categorical_msks_values \
                     = np.array(self._categorical_msks_values)
             else:
-                self.categorical_indices_ = None
+                self._categorical_indices = None
                 self._categorical_msks_values \
-                    = np.empty((1, self.batch_size, self.input_layer_sz_))
+                    = np.empty((1, self.batch_size, self.input_layer_size_))
 
             # Finally set the default indices and mask.
             self._default_indices = np.array(list(def_indices), dtype=int)
             self._default_msk_values \
-                = np.zeros((self.batch_size, self.input_layer_sz_))
+                = np.zeros((self.batch_size, self.input_layer_size_))
             if len(self._default_indices) > 0:
                 self._default_msk_values[:, self._default_indices] = 1
 

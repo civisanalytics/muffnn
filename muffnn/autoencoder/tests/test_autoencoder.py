@@ -153,14 +153,14 @@ def test_refitting():
                      dropout=0.0,
                      metric='cross-entropy')
     ae.fit(X)
-    assert ae.input_layer_sz_ == 4, ("Input layer is the wrong size for the "
-                                     "Autoencoder!")
+    assert ae.input_layer_size_ == 4, ("Input layer is the wrong size for "
+                                       "the Autoencoder!")
 
     X_small = X[:, 0:-1]
     assert X_small.shape != X.shape, "Test data for refitting does not work!"
     ae.fit(X_small)
-    assert ae.input_layer_sz_ == 3, ("Input layer is the wrong size for the "
-                                     "Autoencoder!")
+    assert ae.input_layer_size_ == 3, ("Input layer is the wrong size for "
+                                       "the Autoencoder!")
 
 
 def test_errors_unallowed_metric():
