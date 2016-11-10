@@ -41,12 +41,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     dropout : float or None, optional
         The dropout probability. If None, then dropout will not be used.
         Note that dropout is not applied to the input layer.
-    hidden_activation : callable, optional
+    hidden_activation : tensorflow graph operation, optional
         The activation function for the hidden layers and encoding layer.
         See `tensorflow.nn` for various options.
-    output_activation : callable, optional
+    output_activation : tensorflow graph operation, optional
         The activation function for the output layer.
         See `tensorflow.nn` for various options.
+        If `metric` is set to 'cross-entropy', then only
+        `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` are valid
+        options.
     random_state: int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
