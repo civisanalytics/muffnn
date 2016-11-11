@@ -307,10 +307,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                         # numerator using the mask.
                         scores += tf.nn.softmax_cross_entropy_with_logits(
                             tsub, isub, dim=0)
-                        softmax_denom = tf.exp(
-                            tf.reduce_logsumexp(tsub, reduction_indices=[0]))
+                        log_softmax_denom = tf.reduce_logsumexp(
+                            tsub, reduction_indices=[0])
                         t = ((1.0 - default_msk) * t +
-                             default_msk * tf.exp(t) / softmax_denom)
+                             default_msk * tf.exp(t - log_softmax_denom))
                     else:
                         raise ValueError("Only `tensorflow.nn.sigmoid` and "
                                          "`tensorflow.nn.softmax` output "
