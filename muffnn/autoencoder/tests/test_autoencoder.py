@@ -9,7 +9,6 @@ import pickle
 
 import pytest
 import numpy as np
-import scipy.special
 import scipy.sparse as sp
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
@@ -25,45 +24,11 @@ _LOGGER = logging.getLogger(__name__)
 iris = load_iris()
 
 
-def sigmoid_cross_entropy(ytrue, ypred):
-    """Compute the cross-entropy for a set of [0, 1] labels and output
-    probabilities for each label.
+def _cross_entropy(ytrue, ypred):
+    """Compute the cross-entropy for a classifier.
 
-    This function computes
-
-        - ytrue * np.log(ypred) - (1 - ytrue) * np.log(1 - ypred)
-
-    This function uses the numerically stable version from TensorFlow
-
-        np.max(x, 0) - x * z + np.log(1 + np.exp(-np.abs(x)))
-
-    where `x` is the logit of `ypred` and `z` is `ytrue`.
-
-    It also handles 0's and 1's specially since they can produce NaNs with
-    the TensorFlow version.
-    """
-
-    ce = np.zeros_like(ytrue)
-    x = scipy.special.logit(ypred)
-    z = ytrue
-    q = np.isfinite(x)
-    ce[q] = (np.clip(x[q], 0.0, np.inf) - x[q] * z[q] +
-             np.log(1.0 + np.exp(-1.0 * np.abs(x[q]))))
-
-    # handle 1's and 0's specially
-    q = (((ypred == 1.0) & (ytrue == 1.0)) |
-         ((ypred == 0.0) & (ytrue == 0.0)))
-    ce[q] = 0.0
-
-    q = (((ypred == 1.0) & (ytrue != 1.0)) |
-         ((ypred == 0.0) & (ytrue != 0.0)))
-    ce[q] = np.inf
-
-    return np.sum(ce, axis=1)
-
-
-def softmax_cross_entropy(ytrue, ypred):
-    """Compute the cross-entropy for a multi-class classifier.
+    This function is used instead of the sklearn version since
+    we want the cross-entropy for each example, not the total.
 
     This function computes
 
@@ -71,20 +36,35 @@ def softmax_cross_entropy(ytrue, ypred):
 
     It also handles 0's since they can produce NaNs.
 
-    See scikit.metrics.log_loss for a version with clipping of the
-    probabilities.
+    If the input arrays both have one-dimension, then binary classes are
+    assumed with the `ypred` being probabilities for the positive class
+    and (0, 1) marking negative and positive examples in `ytrue`.
     """
 
-    ce = np.zeros_like(ytrue)
+    if ytrue.ndim == 1 and ypred.ndim == 1:
+        # Convert 1d inputs to 2d assuming binary classes.
+        _ytrue = np.zeros((ytrue.shape[0], 2))
+        q = ytrue == 1
+        _ytrue[q, 1] = 1
+        _ytrue[~q, 0] = 1
 
-    q = ypred > 0.0
-    ce[q] = -1.0 * ytrue[q] * np.log(ypred[q])
+        _ypred = np.zeros((ytrue.shape[0], 2))
+        _ypred[:, 0] = 1.0 - ypred
+        _ypred[:, 1] = ypred
+    else:
+        _ytrue = ytrue
+        _ypred = ypred
+
+    ce = np.zeros_like(_ytrue)
+
+    q = _ypred > 0.0
+    ce[q] = -1.0 * _ytrue[q] * np.log(_ypred[q])
 
     # handle 0's specially
-    q = (ypred == 0.0) & (ytrue == 0.0)
+    q = (_ypred == 0.0) & (_ytrue == 0.0)
     ce[q] = 0.0
 
-    q = (ypred == 0.0) & (ytrue != 0.0)
+    q = (_ypred == 0.0) & (_ytrue != 0.0)
     ce[q] = np.inf
 
     return np.sum(ce, axis=1)
@@ -228,6 +208,20 @@ def _check_ae(max_score,
               cat_inds=None,
               n_epochs=5000,
               metric='mse'):
+    """Helper function for testing the Autoencoder.
+
+    This function does in order:
+
+    1. Loads the Iris data.
+    2. Converts columns to either binary (bin_inds) or categorical (cat_inds).
+    3. Converts the data to a sparse type (sparse_type).
+    4. Builds and trains the autoencoder (learning_rate, n_epochs, dropout,
+        hidden_units, metric, bin_inds_to_use)
+    5. Tests the outputs (max_score).
+
+    The `bin_inds_to_use` parameter in particular specifies which columns
+    the autoencoder is explicitly told are binary values.
+    """
     # Use the iris features.
     X = iris.data
     X = MinMaxScaler().fit_transform(X)
@@ -317,17 +311,17 @@ def _check_ae(max_score,
     scores = 0.0
     for i in range(X.shape[1]):
         if binary_inds is not None and i in binary_inds:
-            scores += sigmoid_cross_entropy(X[:, i:i+1], Xdec[:, i:i+1])
+            scores += _cross_entropy(X[:, i], Xdec[:, i])
         elif cat_size is not None and i in cat_begin:
             ind = cat_begin.index(i)
             b = cat_begin[ind]
             s = cat_size[ind]
-            scores += softmax_cross_entropy(X[:, b:b+s], Xdec[:, b:b+s])
+            scores += _cross_entropy(X[:, b:b+s], Xdec[:, b:b+s])
         elif i in def_inds:
             if metric == 'mse':
                 scores += np.sum((X[:, i:i+1] - Xdec[:, i:i+1]) ** 2, axis=1)
             else:
-                scores += sigmoid_cross_entropy(X[:, i:i+1], Xdec[:, i:i+1])
+                scores += _cross_entropy(X[:, i], Xdec[:, i])
 
     ae_scores = ae.score_samples(X)
     assert_array_almost_equal(scores, ae_scores, decimal=5)
@@ -426,8 +420,8 @@ def test_cross_entropy_softmax_single_unit():
             assert_array_almost_equal(np.sum(Xdec[:, 1:], axis=1), 1.0)
 
             # Compute and test the scores.
-            scores = softmax_cross_entropy(X[:, 1:], Xdec[:, 1:])
-            scores += sigmoid_cross_entropy(X[:, 0:1], Xdec[:, 0:1])
+            scores = _cross_entropy(X[:, 1:], Xdec[:, 1:])
+            scores += _cross_entropy(X[:, 0], Xdec[:, 0])
 
             ae_scores = ae.score_samples(X)
             assert_array_almost_equal(scores, ae_scores, decimal=5)
@@ -436,7 +430,7 @@ def test_cross_entropy_softmax_single_unit():
             assert_array_almost_equal(np.sum(Xdec, axis=1), 1.0)
 
             # Compute and test the scores.
-            scores = softmax_cross_entropy(X, Xdec)
+            scores = _cross_entropy(X, Xdec)
             ae_scores = ae.score_samples(X)
             assert_array_almost_equal(scores, ae_scores, decimal=5)
 

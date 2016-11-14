@@ -132,6 +132,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                                             "input_values")
         t = self._input_values
 
+        # These masks are for construction the mixed metric output layer and
+        # scores. TensorFlow does not support scatter operations into Tesnors
+        # (i.e., the results of TF graph operations). Thus we use masks to
+        # place the right data in the right spot.
+        # The masks are `1` where the data should be and `0` otherwise.
+        # Thus you can do things like
+        # `data_new = msk * tf.exp(data) + (1 - msk) * data`
+        # to compute `tf.exp` of just a part of the data where the masks
+        # are `1`.
         self._default_msk = tf.placeholder(tf.float32,
                                            [None, self.input_layer_size_],
                                            "default_msk")
@@ -170,9 +179,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 t = self.hidden_activation(t)
 
         # Finally do outputs and objective function.
-        t, scores = self._build_output_layer_and_scores(t)
-        self._output_values = t
-        self._scores = scores
+        self._output_values, self._scores \
+            = self._build_output_layer_and_scores(t)
         self._obj_func = tf.reduce_mean(self._scores)
 
         # Training w/ Adam for now.
@@ -193,13 +201,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 learning_rate=self.learning_rate).minimize(self._obj_func)
 
     def _build_output_layer_and_scores(self, t):
-        """Add ops for output layer and scores to the graph."""
+        """Add ops for output layer and scores to the graph.
+
+        Here `t` is the output layer before the output activation has been
+        applied.
+        """
         scores = 0.0
 
-        # Below a transpose on `t` is needed if the TF op `gather` is used
-        # on the features dimension of `t` (i.e., dim 2).
-        # A shortcut has been added here to avoid a transpose if it is not
-        # needed.
+        # The first `if` case here is for a single output variable type
+        # and metric. The `else` is for mixed output types and metrics.
         if (self._categorical_indices is None and
                 self._binary_indices is None):
 
@@ -229,8 +239,17 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             else:
                 raise ValueError('Metric "%s" is not allowed!' % self.metric)
         else:
-            # Use the transpose since gather works on first dim.
+            # A transpose on `t` is needed if the TF op `gather` is used
+            # on the features dimension of `t` (i.e., dim 2) since
+            # gather works on first dim in tensorflow.
             t = tf.transpose(t)
+
+            # Note that the code below uses the masks denoting where the
+            # variables of each type are stored. This allows tensorflow to
+            # compute the proper outputs and scores for each variable. We are
+            # using masks here because we cannot scatter into `Tensors` (i.e,
+            # we cannot use a tensorflow scatter operation on the result of a
+            # tnesorflow operation).
 
             # Categorical vars w/ one-hot encoding.
             # Softmax all of the categorical stuff and use cross-entropy.
@@ -395,6 +414,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             state['_binary_msk_values'] = self._binary_msk_values
             state['_default_msk_values'] = self._default_msk_values
             state['_categorical_msks_values'] = self._categorical_msks_values
+            state['_random_state'] = self._random_state
 
         return state
 
@@ -438,11 +458,11 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # indexed by row.
         X = check_array(X, accept_sparse=['csr'])
 
-        random_state = check_random_state(self.random_state)
-        assert self.batch_size > 0, "batch_size <= 0"
-
         # Initialize the model if it hasn't been already by a previous call.
         if not self._is_fitted:
+            self._random_state = check_random_state(self.random_state)
+            assert self.batch_size > 0, "batch_size <= 0"
+
             self.input_layer_size_ = X.shape[1]
 
             # Indices for default metric, used for updates in metric.
@@ -487,13 +507,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 = np.zeros((self.batch_size, self.input_layer_size_))
             if len(self._default_indices) > 0:
                 self._default_msk_values[:, self._default_indices] = 1
+            else:
+                self._default_indices = None
 
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
             # set a graph to be treated as the default graph.
             self.graph_ = tf.Graph()
             with self.graph_.as_default():
-                tf.set_random_seed(random_state.randint(0, 10000000))
+                tf.set_random_seed(self._random_state.randint(0, 10000000))
 
                 tf.get_variable_scope().set_initializer(
                     tf.contrib.layers.xavier_initializer())
@@ -516,7 +538,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             start_idx = 0
             epoch = 0
             indices = np.arange(n_examples)
-            random_state.shuffle(indices)
+            self._random_state.shuffle(indices)
 
             while True:
                 batch_ind = indices[start_idx:start_idx + self.batch_size]
@@ -531,7 +553,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     epoch += 1
                     if epoch >= self.n_epochs:
                         break
-                    random_state.shuffle(indices)
+                    self._random_state.shuffle(indices)
 
         return self
 
@@ -545,7 +567,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        Z : numpy array
+        numpy array of shape [n_samples, hidden_units[-1]]
             Encoded data.
         """
 
@@ -586,15 +608,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         Parameters
         ----------
-        X : numpy array or sparse matrix of shape [n_samples, n_features]
-            Encoded data to decode
+        X : numpy array or sparse matrix of shape [n_samples, hidden_units[-1]]
+            Encoded data to decode. Input shape should
 
         return_sparse : bool, optional
             If True, return a sparse matrix.
 
         Returns
         -------
-        Z : numpy array
+        numpy array of shape [n_samples, n_features]
             Decoded data.
         """
 
@@ -602,6 +624,11 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             raise NotFittedError("Call fit before inverse_transform!")
 
         X = check_array(X)
+
+        if X.shape[1] != self._encoded_values.get_shape()[1]:
+            raise ValueError("Number of features in the encoded data does "
+                             "not match the number assumed by the "
+                             "estimator!")
 
         # Make predictions in batches.
         pred_batches = []
