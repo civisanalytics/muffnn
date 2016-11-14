@@ -180,7 +180,7 @@ def test_errors_unallowed_metric():
         assert "Metric 'blah'" in str(e), (
             "Wrong error raised for testing unallowed metrics!")
 
-    # All features use the default metric.
+    # Not all features use the default metric.
     ae = Autoencoder(metric='blah', binary_indices=[0])
     with pytest.raises(ValueError) as e:
         ae.fit(X)
@@ -207,7 +207,7 @@ def test_errors_metric_output_activation():
             "Wrong error raised for testing 'cross-entropy' metric with "
             "output activation that is not allowed for all features!")
 
-    # All features use the default metric.
+    # Not all features use the default metric.
     ae = Autoencoder(metric='cross-entropy',
                      output_activation=tf.exp,
                      binary_indices=[0])
