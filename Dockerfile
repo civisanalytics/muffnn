@@ -24,10 +24,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y && \
 
 
 RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
-    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.0.5-Linux-x86_64.sh && \
-    /bin/bash /Miniconda3-4.0.5-Linux-x86_64.sh -b -p /opt/conda && \
-    rm Miniconda3-4.0.5-Linux-x86_64.sh && \
-    /opt/conda/bin/conda install --yes conda==4.0.5
+    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh && \
+    /bin/bash /Miniconda3-4.2.12-Linux-x86_64.sh -b -p /opt/conda && \
+    rm Miniconda3-4.2.12-Linux-x86_64.sh && \
+    /opt/conda/bin/conda install --yes conda==4.2.12
 
 COPY . /src/muffnn
 RUN conda env create -f /src/muffnn/environment.yml -q
