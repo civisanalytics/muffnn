@@ -131,7 +131,7 @@ def test_refitting():
                      random_state=4556,
                      learning_rate=1e-2,
                      dropout=0.0,
-                     metric='cross-entropy')
+                     loss='cross-entropy')
     ae.fit(X)
     assert ae.input_layer_size_ == 4, ("Input layer is the wrong size for "
                                        "the Autoencoder!")
@@ -143,33 +143,33 @@ def test_refitting():
                                        "the Autoencoder!")
 
 
-def test_errors_unallowed_metric():
-    """Make sure unallowed metrics cause an error."""
+def test_errors_unallowed_loss():
+    """Make sure unallowed losses cause an error."""
 
     # This data will not actually be fit.
     # I am just using it to call the `fit` method.
     X = np.ones((1000, 4))
 
     # There are two code paths for this test. One for all features
-    # using the default metric and one for a mix of metrics.
+    # using the default loss and one for a mix of losses.
 
-    # All features use the default metric.
-    ae = Autoencoder(metric='blah')
+    # All features use the default loss.
+    ae = Autoencoder(loss='blah')
     with pytest.raises(ValueError) as e:
         ae.fit(X)
-        assert "Metric 'blah'" in str(e), (
-            "Wrong error raised for testing unallowed metrics!")
+        assert "Loss 'blah'" in str(e), (
+            "Wrong error raised for testing unallowed losses!")
 
-    # Not all features use the default metric.
-    ae = Autoencoder(metric='blah', binary_indices=[0])
+    # Not all features use the default loss.
+    ae = Autoencoder(loss='blah', sigmoid_indices=[0])
     with pytest.raises(ValueError) as e:
         ae.fit(X)
-        assert "Metric 'blah'" in str(e), (
-            "Wrong error raised for testing unallowed metrics!")
+        assert "Loss 'blah'" in str(e), (
+            "Wrong error raised for testing unallowed losses!")
 
 
-def test_errors_metric_output_activation():
-    """Make sure cross-entropy metric with activations not equal to
+def test_errors_loss_output_activation():
+    """Make sure cross-entropy loss with activations not equal to
     `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` fails."""
 
     # This data will not actually be fit.
@@ -177,24 +177,24 @@ def test_errors_metric_output_activation():
     X = np.ones((1000, 4))
 
     # There are two code paths for this test. One for all features
-    # using the default metric and one for a mix of metrics.
+    # using the default loss and one for a mix of losses.
 
-    # All features use the default metric.
-    ae = Autoencoder(metric='cross-entropy', output_activation=tf.exp)
+    # All features use the default loss.
+    ae = Autoencoder(loss='cross-entropy', output_activation=tf.exp)
     with pytest.raises(ValueError) as e:
         ae.fit(X)
-        assert "'cross-entropy' metric!" in str(e), (
-            "Wrong error raised for testing 'cross-entropy' metric with "
+        assert "'cross-entropy' loss!" in str(e), (
+            "Wrong error raised for testing 'cross-entropy' loss with "
             "output activation that is not allowed for all features!")
 
-    # Not all features use the default metric.
-    ae = Autoencoder(metric='cross-entropy',
+    # Not all features use the default loss.
+    ae = Autoencoder(loss='cross-entropy',
                      output_activation=tf.exp,
-                     binary_indices=[0])
+                     sigmoid_indices=[0])
     with pytest.raises(ValueError) as e:
         ae.fit(X)
-        assert "'cross-entropy' metric!" in str(e), (
-            "Wrong error raised for testing 'cross-entropy' metric with "
+        assert "'cross-entropy' loss!" in str(e), (
+            "Wrong error raised for testing 'cross-entropy' loss with "
             "output activation that is not allowed for a subset of features!")
 
 
@@ -207,20 +207,22 @@ def _check_ae(max_score,
               bin_inds_to_use=None,
               cat_inds=None,
               n_epochs=5000,
-              metric='mse'):
+              loss='mse'):
     """Helper function for testing the Autoencoder.
 
     This function does in order:
 
     1. Loads the Iris data.
     2. Converts columns to either binary (bin_inds) or categorical (cat_inds).
+        Binary stuff is sent as sigmoid indices and categorical stuff is sent
+        as softmax indices.
     3. Converts the data to a sparse type (sparse_type).
     4. Builds and trains the autoencoder (learning_rate, n_epochs, dropout,
-        hidden_units, metric, bin_inds_to_use)
+        hidden_units, loss, bin_inds_to_use)
     5. Tests the outputs (max_score).
 
     The `bin_inds_to_use` parameter in particular specifies which columns
-    the autoencoder is explicitly told are binary values.
+    the autoencoder is explicitly told are sigmoid values.
     """
     # Use the iris features.
     X = iris.data
@@ -272,7 +274,7 @@ def _check_ae(max_score,
     if sparse_type is not None:
         X = getattr(sp, sparse_type + '_matrix')(X)
 
-    # For sigmoid metric runs, we can set the metric or use binary_indices.
+    # For sigmoid runs, we can set the loss or use sigmoid_indices.
     # This if handles those cases.
     if bin_inds_to_use is None and binary_inds is not None:
         bin_inds_to_use = binary_inds
@@ -284,9 +286,9 @@ def _check_ae(max_score,
                      random_state=4556,
                      learning_rate=learning_rate,
                      dropout=dropout,
-                     metric=metric,
-                     binary_indices=bin_inds_to_use,
-                     categorical_indices=cat_indices)
+                     loss=loss,
+                     sigmoid_indices=bin_inds_to_use,
+                     softmax_indices=cat_indices)
 
     Xenc = ae.fit_transform(X)
     Xdec = ae.inverse_transform(Xenc)
@@ -318,7 +320,7 @@ def _check_ae(max_score,
             s = cat_size[ind]
             scores += _cross_entropy(X[:, b:b+s], Xdec[:, b:b+s])
         elif i in def_inds:
-            if metric == 'mse':
+            if loss == 'mse':
                 scores += np.sum((X[:, i:i+1] - Xdec[:, i:i+1]) ** 2, axis=1)
             else:
                 scores += _cross_entropy(X[:, i], Xdec[:, i])
@@ -347,22 +349,22 @@ MSE_MAX_SCORE = 0.1
 
 
 def test_mse_single_hidden_unit():
-    """Test the MSE metric w/ a single hidden unit."""
+    """Test the MSE loss w/ a single hidden unit."""
     _check_ae(MSE_MAX_SCORE, hidden_units=(1,))
 
 
 def test_mse_multiple_hidden_units():
-    """Test the MSE metric w/ 2 hidden units."""
+    """Test the MSE loss w/ 2 hidden units."""
     _check_ae(MSE_MAX_SCORE, hidden_units=(2,))
 
 
 def test_mse_multiple_layers():
-    """Test the MSE metric w/ layers (3, 2)."""
+    """Test the MSE loss w/ layers (3, 2)."""
     _check_ae(MSE_MAX_SCORE, hidden_units=(3, 2))
 
 
 def test_mse_dropout():
-    """Test the MSE metric w/ dropout."""
+    """Test the MSE loss w/ dropout."""
     ae_score_dropout = _check_ae(MSE_MAX_SCORE,
                                  hidden_units=(20, 20, 10, 10, 2),
                                  dropout=0.05,
@@ -378,8 +380,9 @@ def test_mse_dropout():
                                                    " dropout!")
 
 
-def test_cross_entropy_softmax_single_unit():
-    """Test the cross-entropy metric w/ softmax and a single hidden unit."""
+def test_sigmoid_softmax_cross_entropy_loss_single_hidden_unit():
+    """Test the cross-entropy loss w/ softmax, sigmoid and a single
+    hidden unit."""
 
     # Use the iris features.
     X = iris.data
@@ -402,9 +405,9 @@ def test_cross_entropy_softmax_single_unit():
                          random_state=4556,
                          learning_rate=1e-1,
                          dropout=0.0,
-                         metric='cross-entropy',
+                         loss='cross-entropy',
                          output_activation=tf.nn.softmax,
-                         binary_indices=binary_indices)
+                         sigmoid_indices=binary_indices)
 
         Xenc = ae.fit_transform(X)
         Xdec = ae.inverse_transform(Xenc)
@@ -448,16 +451,16 @@ def test_cross_entropy_softmax_single_unit():
                                 "less than 2.5 for the iris features.")
 
 
-def test_cross_entropy_single_hidden_unit():
-    """Test the cross-entropy metric w/ a single hidden unit."""
+def test_sigmoid_single_hidden_unit():
+    """Test sigmoid indices w/ a single hidden unit."""
     _check_ae(1.2,
               hidden_units=(1,),
               bin_inds=range(4),
-              metric='cross-entropy')
+              loss='cross-entropy')
 
 
-def test_cross_entropy_or_binary():
-    """Test to make sure binary indices or cross-entropy metric
+def test_cross_entropy_or_sigmoid():
+    """Test to make sure sigmoid indices or cross-entropy loss
     works in all cases."""
     # Use a variety of cases here.
     scores = []
@@ -467,7 +470,7 @@ def test_cross_entropy_or_binary():
             1.5,
             n_epochs=1000,
             bin_inds=range(4),
-            metric='cross-entropy',
+            loss='cross-entropy',
             bin_inds_to_use=binary_indices))
 
     # All scores should be equal.
@@ -475,8 +478,8 @@ def test_cross_entropy_or_binary():
         assert_almost_equal(score, scores[0], decimal=5)
 
 
-def test_cat_single_hidden_unit():
-    """Test categorical metric w/ a single hidden unit."""
+def test_softmax_single_hidden_unit():
+    """Test softmax indices a single hidden unit."""
     _check_ae(3.0, hidden_units=(1,), cat_inds=range(4))
 
 
@@ -495,18 +498,18 @@ def test_sparse_inputs():
         assert_almost_equal(score, scores[0])
 
 
-def test_cross_entropy_mse_single_hidden_unit():
-    """Test cross-entropy + MSE metric w/ a single hidden unit."""
+def test_sigmoid_mse_single_hidden_unit():
+    """Test sigmoid indices + MSE loss w/ a single hidden unit."""
     _check_ae(0.2, hidden_units=(1,), bin_inds=[2, 3])
 
 
-def test_cat_mse_single_hidden_unit():
-    """Test categorical + MSE metric w/ a single hidden unit."""
+def test_softmax_mse_single_hidden_unit():
+    """Test softmax indices + MSE loss w/ a single hidden unit."""
     _check_ae(1.1, hidden_units=(1,), cat_inds=[2, 3])
 
 
-def test_cat_cross_entropy_single_hidden_unit():
-    """Test categorical + cross-entropy metric w/ a single hidden unit."""
+def test_softmax_sigmoid_single_hidden_unit():
+    """Test softmax + sigmoid indices w/ a single hidden unit."""
     CAT_CE_MAX_SCORE = 1.7
     score_noinds = _check_ae(
         CAT_CE_MAX_SCORE,
@@ -514,18 +517,18 @@ def test_cat_cross_entropy_single_hidden_unit():
         cat_inds=[2, 3],
         bin_inds=[0, 1],
         bin_inds_to_use=-1,
-        metric='cross-entropy')
+        loss='cross-entropy')
     score_inds = _check_ae(
         CAT_CE_MAX_SCORE,
         hidden_units=(1,),
         cat_inds=[2, 3],
         bin_inds=[0, 1],
-        metric='mse')
+        loss='mse')
     assert_almost_equal(score_noinds, score_inds)
 
 
-def test_cat_cross_entropy_mse_single_hidden_unit():
-    """Test categorical + cross-entropy + MSE metric w/ a single
+def test_softmax_sigmoid_mse_single_hidden_unit():
+    """Test softmax + sigmoid indices + MSE loss w/ a single
     hidden unit."""
     _check_ae(1.0,
               hidden_units=(1,),

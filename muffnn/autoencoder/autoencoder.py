@@ -47,7 +47,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     output_activation : tensorflow graph operation, optional
         The activation function for the output layer.
         See `tensorflow.nn` for various options.
-        If `metric` is set to 'cross-entropy', then only
+        If `loss` is set to 'cross-entropy', then only
         `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` are valid
         options.
     random_state: int, RandomState instance or None, optional
@@ -56,20 +56,20 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         used.
     learning_rate : float, optional
         Learning rate for Adam.
-    metric : string, optional
-        Default metric for the autoencoder. Options are
+    loss : string, optional
+        Default loss for the autoencoder. Options are
             'mse' - mean square error
             'cross-entropy' - cross-entropy
         Note that this will be overridden for columns specified by
-        `binary_indices` or `categorical_indices`
-    binary_indices : array-like, shape (n_binary,), optional
+        `sigmoid_indices` or `softmax_indices`
+    sigmoid_indices : array-like, shape (n_sigmoid,), optional
         Array of indices for which `tf.nn.sigmoid` will be used for the
         output layer activation and cross-entropy will be used in the loss
         function.
-    categorical_indices : array-like, shape (n_categorical, 2), optional
+    softmax_indices : array-like, shape (n_softmax, 2), optional
         An array where each row specifies a range of indices for a categorical
         variable that has been expanded to multiple indices (e.g.,
-        one-hot encoded).
+        one-hot encoded) or set of variables which should sum to unity.
         The first column contains start indices. The second column contains
         lengths. For each range of indices, the output layer will use
         `tensorflow.nn.softmax` activation and the loss function will use
@@ -93,9 +93,17 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
     Notes
     -----
+    If your data is of all one type (e.g., all binary 0/1 labels or a single
+    set of variables that always sum to unity), then you can directly change
+    the output activation and loss as opposed to using the `sigmoid_indices`
+    or `softmax_indices` keywords. These keywords are for data which has
+    mixed type (e.g., one wants some data to be treated with the MSE loss
+    while using a cross-entropy loss elsewhere.)
+
     `Adam
     <https://www.tensorflow.org/versions/r0.8/api_docs/python/train.html#AdamOptimizer>`
     is used for optimization.
+
     Xavier initialization (
     `<https://www.tensorflow.org/versions/r0.8/api_docs/python/contrib.layers.html#xavier_initializer>`
     ) is used for the weights.
@@ -104,8 +112,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     def __init__(self, hidden_units=(16,), batch_size=128, n_epochs=5,
                  dropout=None, hidden_activation=tf.nn.sigmoid,
                  output_activation=tf.nn.sigmoid, random_state=None,
-                 learning_rate=1e-3, metric='mse', binary_indices=None,
-                 categorical_indices=None):
+                 learning_rate=1e-3, loss='mse', sigmoid_indices=None,
+                 softmax_indices=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -114,9 +122,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         self.output_activation = output_activation
         self.random_state = random_state
         self.learning_rate = learning_rate
-        self.metric = metric
-        self.binary_indices = binary_indices
-        self.categorical_indices = categorical_indices
+        self.loss = loss
+        self.sigmoid_indices = sigmoid_indices
+        self.softmax_indices = softmax_indices
 
     def _set_up_graph(self):
         """Initialize TF objects (needed before fitting or restoring)."""
@@ -132,7 +140,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                                             "input_values")
         t = self._input_values
 
-        # These masks are for construction the mixed metric output layer and
+        # These masks are for construction the mixed loss output layer and
         # scores. TensorFlow does not support scatter operations into Tesnors
         # (i.e., the results of TF graph operations). Thus we use masks to
         # place the right data in the right spot.
@@ -145,14 +153,14 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                                            [None, self.input_layer_size_],
                                            "default_msk")
 
-        self._binary_msk = tf.placeholder(tf.bool,
-                                          [None, self.input_layer_size_],
-                                          "binary_msk")
+        self._sigmoid_msk = tf.placeholder(tf.bool,
+                                           [None, self.input_layer_size_],
+                                           "sigmoid_msk")
 
-        self._categorical_msks = tf.placeholder(
+        self._softmax_msks = tf.placeholder(
             tf.bool,
             [None, None, self.input_layer_size_],
-            "categorical_msks")
+            "softmax_msks")
 
         # Fan in layers.
         for i, layer_sz in enumerate(self.hidden_units):
@@ -185,7 +193,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Training w/ Adam for now.
         # Catching a warning related to TensorFlow sparse to dense conversions
-        # from the graph ops for the scores for mixed metrics:
+        # from the graph ops for the scores for mixed losses:
         # '.../tensorflow/python/ops/gradients.py:90: UserWarning: Converting
         #  sparse IndexedSlices to a dense Tensor of unknown shape. This may
         #  consume a large amount of memory.
@@ -207,9 +215,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         applied.
         """
         # The first `if` case here is for a single output variable type
-        # and metric. The `else` is for mixed output types and metrics.
-        if (self._categorical_indices is None and
-                self._binary_indices is None):
+        # and loss. The `else` is for mixed output types and losses.
+        if (self._softmax_indices is None and self._sigmoid_indices is None):
             return self._build_one_type_output_layer(t)
         else:
             return self._build_mixed_type_output_layer(t)
@@ -222,13 +229,13 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         applied.
         """
 
-        if self.metric == 'mse':
+        if self.loss == 'mse':
             if self.output_activation is not None:
                 t = self.output_activation(t)
             diff = t - self._input_values
             scores = tf.reduce_sum(tf.square(diff),
                                    reduction_indices=[1])
-        elif self.metric == 'cross-entropy':
+        elif self.loss == 'cross-entropy':
             if self.output_activation is tf.nn.sigmoid:
                 scores = tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
@@ -243,9 +250,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 raise ValueError("Only `tensorflow.nn.sigmoid` and "
                                  "`tensorflow.nn.softmax` output "
                                  "activations can be used with the "
-                                 "'cross-entropy' metric!")
+                                 "'cross-entropy' loss!")
         else:
-            raise ValueError('Metric "%s" is not allowed!' % self.metric)
+            raise ValueError('Loss "%s" is not allowed!' % self.loss)
 
         return t, scores
 
@@ -270,13 +277,12 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # we cannot use a tensorflow scatter operation on the result of a
         # tensorflow operation).
 
-        # Categorical vars w/ one-hot encoding.
-        # Softmax all of the categorical stuff and use cross-entropy.
-        if self._categorical_indices is not None:
+        # Softmax vars (will sum to unity) w/ cross-entropy.
+        if self._softmax_indices is not None:
             for i, begin, size in zip(
-                    range(self._categorical_indices.shape[0]),
-                    self._categorical_indices[:, 0],
-                    self._categorical_indices[:, 1]):
+                    range(self._softmax_indices.shape[0]),
+                    self._softmax_indices[:, 0],
+                    self._softmax_indices[:, 1]):
                 tsub = tf.slice(t, [begin, 0], [size, -1])
                 scores += tf.nn.softmax_cross_entropy_with_logits(
                     tsub,
@@ -291,28 +297,27 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 # values. Because softmax has a sumexp operation,
                 # I split the softmax in two, doing the sumexp on
                 # the proper subset of the elements.
-                msk = tf.transpose(self._categorical_msks[i, :, :])
+                msk = tf.transpose(self._softmax_msks[i, :, :])
                 log_softmax_denom = tf.reduce_logsumexp(
                     tsub, keep_dims=True, reduction_indices=[0])
                 t = tf.select(msk, tf.exp(t - log_softmax_denom), t)
 
-        # Discrete 0/1 stuff.
         # Sigmoid output w/ cross-entropy.
-        if self._binary_indices is not None:
-            tsub = tf.gather(t, self._binary_indices)
+        if self._sigmoid_indices is not None:
+            tsub = tf.gather(t, self._sigmoid_indices)
             isub = tf.gather(tf.transpose(self._input_values),
-                             self._binary_indices)
+                             self._sigmoid_indices)
             scores += tf.reduce_sum(
                 tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
                 reduction_indices=[0])
-            binary_msk = tf.transpose(self._binary_msk)
-            t = tf.select(binary_msk, tf.nn.sigmoid(t), t)
+            sigmoid_msk = tf.transpose(self._sigmoid_msk)
+            t = tf.select(sigmoid_msk, tf.nn.sigmoid(t), t)
 
-        # Anything left uses the default metric.
+        # Anything left uses the default loss.
         if self._default_indices is not None:
             default_msk = tf.transpose(self._default_msk)
 
-            if self.metric == 'mse':
+            if self.loss == 'mse':
                 if self.output_activation is not None:
                     t = tf.select(default_msk, self.output_activation(t), t)
                 tsub = tf.gather(t, self._default_indices)
@@ -321,7 +326,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 diff = isub - tsub
                 scores += tf.reduce_sum(tf.square(diff),
                                         reduction_indices=[0])
-            elif self.metric == 'cross-entropy':
+            elif self.loss == 'cross-entropy':
                 tsub = tf.gather(t, self._default_indices)
                 isub = tf.gather(tf.transpose(self._input_values),
                                  self._default_indices)
@@ -347,10 +352,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     raise ValueError("Only `tensorflow.nn.sigmoid` and "
                                      "`tensorflow.nn.softmax` output "
                                      "activations can be used with the "
-                                     "'cross-entropy' metric!")
+                                     "'cross-entropy' loss!")
             else:
-                raise ValueError('Metric "%s" is not allowed!' %
-                                 self.metric)
+                raise ValueError('Loss "%s" is not allowed!' %
+                                 self.loss)
 
         # Undo the transpose here.
         t = tf.transpose(t)
@@ -376,14 +381,14 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             feed_dict[self._dropout] = \
                 self.dropout if self.dropout is not None else 0.0
 
-        feed_dict[self._binary_msk] \
-            = self._binary_msk_values[0:X.shape[0], :]
+        feed_dict[self._sigmoid_msk] \
+            = self._sigmoid_msk_values[0:X.shape[0], :]
 
         feed_dict[self._default_msk] \
             = self._default_msk_values[0:X.shape[0], :]
 
-        feed_dict[self._categorical_msks] \
-            = self._categorical_msks_values[:, 0:X.shape[0], :]
+        feed_dict[self._softmax_msks] \
+            = self._softmax_msks_values[:, 0:X.shape[0], :]
 
         return feed_dict
 
@@ -414,19 +419,19 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                           random_state=self.random_state,
                           n_epochs=self.n_epochs,
                           learning_rate=self.learning_rate,
-                          metric=self.metric,
-                          binary_indices=self.binary_indices,
-                          categorical_indices=self.categorical_indices,
+                          loss=self.loss,
+                          sigmoid_indices=self.sigmoid_indices,
+                          softmax_indices=self.softmax_indices,
                           ))
 
         # Add fitted attributes if the model has been fitted.
         if self._is_fitted:
             state['input_layer_size_'] = self.input_layer_size_
-            state['_binary_indices'] = self._binary_indices
-            state['_categorical_indices'] = self._categorical_indices
-            state['_binary_msk_values'] = self._binary_msk_values
+            state['_sigmoid_indices'] = self._sigmoid_indices
+            state['_softmax_indices'] = self._softmax_indices
+            state['_sigmoid_msk_values'] = self._sigmoid_msk_values
             state['_default_msk_values'] = self._default_msk_values
-            state['_categorical_msks_values'] = self._categorical_msks_values
+            state['_softmax_msks_values'] = self._softmax_msks_values
             state['_random_state'] = self._random_state
 
         return state
@@ -478,44 +483,45 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             self.input_layer_size_ = X.shape[1]
 
-            # Indices for default metric, used for updates in metric.
+            # Indices for default loss, used for updates in building
+            # the output layer and loss.
             def_indices = set(range(X.shape[1]))
 
-            # Check and set categorical and discrete indices.
-            self._binary_indices = (np.atleast_1d(self.binary_indices)
-                                    if self.binary_indices is not None
-                                    else None)
+            # Check and set sigmoid and softmax indices.
+            self._sigmoid_indices = (np.atleast_1d(self.sigmoid_indices)
+                                     if self.sigmoid_indices is not None
+                                     else None)
 
-            self._binary_msk_values \
+            self._sigmoid_msk_values \
                 = np.zeros((self.batch_size, self.input_layer_size_))
-            if self._binary_indices is not None:
-                def_indices -= set(self._binary_indices.tolist())
-                self._binary_msk_values[:, self._binary_indices] = 1
-            self._binary_msk_values = self._binary_msk_values.astype(bool)
+            if self._sigmoid_indices is not None:
+                def_indices -= set(self._sigmoid_indices.tolist())
+                self._sigmoid_msk_values[:, self._sigmoid_indices] = 1
+            self._sigmoid_msk_values = self._sigmoid_msk_values.astype(bool)
 
-            if self.categorical_indices is not None:
-                self._categorical_indices \
-                    = np.atleast_2d(self.categorical_indices)
+            if self.softmax_indices is not None:
+                self._softmax_indices \
+                    = np.atleast_2d(self.softmax_indices)
 
-                self._categorical_msks_values = []
-                for begin, size in zip(self._categorical_indices[:, 0],
-                                       self._categorical_indices[:, 1]):
-                    # Remove categorical stuff from def_indices.
+                self._softmax_msks_values = []
+                for begin, size in zip(self._softmax_indices[:, 0],
+                                       self._softmax_indices[:, 1]):
+                    # Remove softmax stuff from def_indices.
                     def_indices -= set(range(begin, begin + size))
 
                     # Keep track of the mask.
                     msk = np.zeros((self.batch_size, self.input_layer_size_))
                     msk[:, range(begin, begin + size)] = 1
-                    self._categorical_msks_values.append(msk)
+                    self._softmax_msks_values.append(msk)
 
-                self._categorical_msks_values \
-                    = np.array(self._categorical_msks_values)
+                self._softmax_msks_values \
+                    = np.array(self._softmax_msks_values)
             else:
-                self._categorical_indices = None
-                self._categorical_msks_values \
+                self._softmax_indices = None
+                self._softmax_msks_values \
                     = np.empty((1, self.batch_size, self.input_layer_size_))
-            self._categorical_msks_values \
-                = self._categorical_msks_values.astype(bool)
+            self._softmax_msks_values \
+                = self._softmax_msks_values.astype(bool)
 
             # Finally set the default indices and mask.
             self._default_indices = np.array(list(def_indices), dtype=int)
