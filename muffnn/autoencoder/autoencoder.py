@@ -141,23 +141,22 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # `data_new = msk * tf.exp(data) + (1 - msk) * data`
         # to compute `tf.exp` of just a part of the data where the masks
         # are `1`.
-        self._default_msk = tf.placeholder(tf.float32,
+        self._default_msk = tf.placeholder(tf.bool,
                                            [None, self.input_layer_size_],
                                            "default_msk")
 
-        self._binary_msk = tf.placeholder(tf.float32,
+        self._binary_msk = tf.placeholder(tf.bool,
                                           [None, self.input_layer_size_],
                                           "binary_msk")
 
         self._categorical_msks = tf.placeholder(
-            tf.float32,
+            tf.bool,
             [None, None, self.input_layer_size_],
             "categorical_msks")
 
         # Fan in layers.
         for i, layer_sz in enumerate(self.hidden_units):
-            # Don't dropout inputs.
-            if i > 0:
+            if self.dropout is not None:
                 t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
             t = affine(t, layer_sz, scope='layer_%d' % i)
             if self.hidden_activation is not None:
@@ -170,7 +169,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         second_layers \
             = list(self.hidden_units[::-1][1:]) + [self.input_layer_size_]
         for i, layer_sz in enumerate(second_layers):
-            t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
+            if self.dropout is not None:
+                t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
             t = affine(t,
                        layer_sz,
                        scope='layer_%d' % (i + len(self.hidden_units)))
@@ -206,141 +206,154 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         Here `t` is the output layer before the output activation has been
         applied.
         """
-        scores = 0.0
-
         # The first `if` case here is for a single output variable type
         # and metric. The `else` is for mixed output types and metrics.
         if (self._categorical_indices is None and
                 self._binary_indices is None):
+            return self._build_one_type_output_layer(t)
+        else:
+            return self._build_mixed_type_output_layer(t)
+
+    def _build_one_type_output_layer(self, t):
+        """Add ops for output layer and scores to the graph for
+        one kind of output.
+
+        Here `t` is the output layer before the output activation has been
+        applied.
+        """
+
+        if self.metric == 'mse':
+            if self.output_activation is not None:
+                t = self.output_activation(t)
+            diff = t - self._input_values
+            scores = tf.reduce_sum(tf.square(diff),
+                                   reduction_indices=[1])
+        elif self.metric == 'cross-entropy':
+            if self.output_activation is tf.nn.sigmoid:
+                scores = tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        t, self._input_values),
+                    reduction_indices=[1])
+                t = tf.nn.sigmoid(t)
+            elif self.output_activation is tf.nn.softmax:
+                scores = tf.nn.softmax_cross_entropy_with_logits(
+                    t, self._input_values, dim=1)
+                t = tf.nn.softmax(t)
+            else:
+                raise ValueError("Only `tensorflow.nn.sigmoid` and "
+                                 "`tensorflow.nn.softmax` output "
+                                 "activations can be used with the "
+                                 "'cross-entropy' metric!")
+        else:
+            raise ValueError('Metric "%s" is not allowed!' % self.metric)
+
+        return t, scores
+
+    def _build_mixed_type_output_layer(self, t):
+        """Add ops for output layer and scores to the graph for
+        mixed outputs.
+
+        Here `t` is the output layer before the output activation has been
+        applied.
+        """
+        scores = 0.0
+
+        # A transpose on `t` is needed if the TF op `gather` is used
+        # on the features dimension of `t` (i.e., dim 2) since
+        # gather works on first dim in tensorflow.
+        t = tf.transpose(t)
+
+        # Note that the code below uses the masks denoting where the
+        # variables of each type are stored. This allows tensorflow to
+        # compute the proper outputs and scores for each variable. We are
+        # using masks here because we cannot scatter into `Tensors` (i.e,
+        # we cannot use a tensorflow scatter operation on the result of a
+        # tensorflow operation).
+
+        # Categorical vars w/ one-hot encoding.
+        # Softmax all of the categorical stuff and use cross-entropy.
+        if self._categorical_indices is not None:
+            for i, begin, size in zip(
+                    range(self._categorical_indices.shape[0]),
+                    self._categorical_indices[:, 0],
+                    self._categorical_indices[:, 1]):
+                tsub = tf.slice(t, [begin, 0], [size, -1])
+                scores += tf.nn.softmax_cross_entropy_with_logits(
+                    tsub,
+                    tf.slice(tf.transpose(self._input_values),
+                             [begin, 0], [size, -1]),
+                    dim=0)
+
+                # This one is painful. TensorFlow does not, AFAIK,
+                # support assignments to Tensors that come out of
+                # operations (it does support assignments to Variables).
+                # So I am using a precomputed mask to to update certain
+                # values. Because softmax has a sumexp operation,
+                # I split the softmax in two, doing the sumexp on
+                # the proper subset of the elements.
+                msk = tf.transpose(self._categorical_msks[i, :, :])
+                log_softmax_denom = tf.reduce_logsumexp(
+                    tsub, keep_dims=True, reduction_indices=[0])
+                t = tf.select(msk, tf.exp(t - log_softmax_denom), t)
+
+        # Discrete 0/1 stuff.
+        # Sigmoid output w/ cross-entropy.
+        if self._binary_indices is not None:
+            tsub = tf.gather(t, self._binary_indices)
+            isub = tf.gather(tf.transpose(self._input_values),
+                             self._binary_indices)
+            scores += tf.reduce_sum(
+                tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
+                reduction_indices=[0])
+            binary_msk = tf.transpose(self._binary_msk)
+            t = tf.select(binary_msk, tf.nn.sigmoid(t), t)
+
+        # Anything left uses the default metric.
+        if self._default_indices is not None:
+            default_msk = tf.transpose(self._default_msk)
 
             if self.metric == 'mse':
                 if self.output_activation is not None:
-                    t = self.output_activation(t)
-
-                diff = t - self._input_values
-                scores = tf.reduce_sum(tf.square(diff),
-                                       reduction_indices=[1])
+                    t = tf.select(default_msk, self.output_activation(t), t)
+                tsub = tf.gather(t, self._default_indices)
+                isub = tf.gather(tf.transpose(self._input_values),
+                                 self._default_indices)
+                diff = isub - tsub
+                scores += tf.reduce_sum(tf.square(diff),
+                                        reduction_indices=[0])
             elif self.metric == 'cross-entropy':
+                tsub = tf.gather(t, self._default_indices)
+                isub = tf.gather(tf.transpose(self._input_values),
+                                 self._default_indices)
+
                 if self.output_activation is tf.nn.sigmoid:
                     scores += tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(
-                            t, self._input_values),
-                        reduction_indices=[1])
-                    t = tf.nn.sigmoid(t)
+                        tf.nn.sigmoid_cross_entropy_with_logits(tsub,
+                                                                isub),
+                        reduction_indices=[0])
+                    t = tf.select(default_msk, tf.nn.sigmoid(t), t)
                 elif self.output_activation is tf.nn.softmax:
+                    # More pain here. The softmax has an implicit sum,
+                    # and since we cannot scatter into Tensors, we
+                    # break up the comp into the denominator and the
+                    # numerator using the mask.
                     scores += tf.nn.softmax_cross_entropy_with_logits(
-                        t, self._input_values, dim=1)
-                    t = tf.nn.softmax(t)
+                        tsub, isub, dim=0)
+                    log_softmax_denom = tf.reduce_logsumexp(
+                        tsub, reduction_indices=[0], keep_dims=True)
+                    t = tf.select(
+                        default_msk, tf.exp(t - log_softmax_denom), t)
                 else:
                     raise ValueError("Only `tensorflow.nn.sigmoid` and "
                                      "`tensorflow.nn.softmax` output "
                                      "activations can be used with the "
                                      "'cross-entropy' metric!")
             else:
-                raise ValueError('Metric "%s" is not allowed!' % self.metric)
-        else:
-            # A transpose on `t` is needed if the TF op `gather` is used
-            # on the features dimension of `t` (i.e., dim 2) since
-            # gather works on first dim in tensorflow.
-            t = tf.transpose(t)
+                raise ValueError('Metric "%s" is not allowed!' %
+                                 self.metric)
 
-            # Note that the code below uses the masks denoting where the
-            # variables of each type are stored. This allows tensorflow to
-            # compute the proper outputs and scores for each variable. We are
-            # using masks here because we cannot scatter into `Tensors` (i.e,
-            # we cannot use a tensorflow scatter operation on the result of a
-            # tnesorflow operation).
-
-            # Categorical vars w/ one-hot encoding.
-            # Softmax all of the categorical stuff and use cross-entropy.
-            if self._categorical_indices is not None:
-                min_float32 = tf.constant(tf.float32.min)
-                for i, begin, size in zip(
-                        range(self._categorical_indices.shape[0]),
-                        self._categorical_indices[:, 0],
-                        self._categorical_indices[:, 1]):
-                    scores += tf.nn.softmax_cross_entropy_with_logits(
-                        tf.slice(t, [begin, 0], [size, -1]),
-                        tf.slice(tf.transpose(self._input_values),
-                                 [begin, 0], [size, -1]),
-                        dim=0)
-
-                    # This one is painful. TensorFlow does not, AFAIK,
-                    # support assignments to Tensors that come out of
-                    # operations (it does support assignments to Variables).
-                    # So I am using a precomputed mask to to update certain
-                    # values. Because softmax has a sumexp operation,
-                    # you have to set the elements not updated to logits
-                    # equal to the most negative float. Then they come out
-                    # to zero after the exp and so fall out of the sumexp.
-                    msk = tf.transpose(self._categorical_msks[i, :, :])
-                    softmax = tf.nn.softmax(
-                        msk * t + (1.0 - msk) * min_float32,
-                        dim=0)
-                    t = (1.0 - msk) * t + msk * softmax
-
-            # Discrete 0/1 stuff.
-            # Sigmoid output w/ cross-entropy.
-            if self._binary_indices is not None:
-                tsub = tf.gather(t, self._binary_indices)
-                isub = tf.gather(tf.transpose(self._input_values),
-                                 self._binary_indices)
-                scores += tf.reduce_sum(
-                    tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
-                    reduction_indices=[0])
-
-                binary_msk = tf.transpose(self._binary_msk)
-                t = ((1.0 - binary_msk) * t +
-                     binary_msk * tf.nn.sigmoid(t))
-
-            # Anything left uses the default metric.
-            if self._default_indices is not None:
-                default_msk = tf.transpose(self._default_msk)
-
-                if self.metric == 'mse':
-                    if self.output_activation is not None:
-                        t = ((1.0 - default_msk) * t +
-                             default_msk * self.output_activation(t))
-                    tsub = tf.gather(t, self._default_indices)
-                    isub = tf.gather(tf.transpose(self._input_values),
-                                     self._default_indices)
-                    diff = isub - tsub
-                    scores += tf.reduce_sum(tf.square(diff),
-                                            reduction_indices=[0])
-                elif self.metric == 'cross-entropy':
-                    tsub = tf.gather(t, self._default_indices)
-                    isub = tf.gather(tf.transpose(self._input_values),
-                                     self._default_indices)
-
-                    if self.output_activation is tf.nn.sigmoid:
-                        scores += tf.reduce_sum(
-                            tf.nn.sigmoid_cross_entropy_with_logits(tsub,
-                                                                    isub),
-                            reduction_indices=[0])
-                        t = ((1.0 - default_msk) * t +
-                             default_msk * tf.nn.sigmoid(t))
-                    elif self.output_activation is tf.nn.softmax:
-                        # More pain here. The softmax has an implicit sum,
-                        # and since we cannot scatter into Tensors, we
-                        # break up the comp into the denominator and the
-                        # numerator using the mask.
-                        scores += tf.nn.softmax_cross_entropy_with_logits(
-                            tsub, isub, dim=0)
-                        log_softmax_denom = tf.reduce_logsumexp(
-                            tsub, reduction_indices=[0])
-                        t = ((1.0 - default_msk) * t +
-                             default_msk * tf.exp(t - log_softmax_denom))
-                    else:
-                        raise ValueError("Only `tensorflow.nn.sigmoid` and "
-                                         "`tensorflow.nn.softmax` output "
-                                         "activations can be used with the "
-                                         "'cross-entropy' metric!")
-                else:
-                    raise ValueError('Metric "%s" is not allowed!' %
-                                     self.metric)
-
-            # Undo the transpose here.
-            t = tf.transpose(t)
+        # Undo the transpose here.
+        t = tf.transpose(t)
 
         return t, scores
 
@@ -478,6 +491,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             if self._binary_indices is not None:
                 def_indices -= set(self._binary_indices.tolist())
                 self._binary_msk_values[:, self._binary_indices] = 1
+            self._binary_msk_values = self._binary_msk_values.astype(bool)
 
             if self.categorical_indices is not None:
                 self._categorical_indices \
@@ -500,6 +514,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 self._categorical_indices = None
                 self._categorical_msks_values \
                     = np.empty((1, self.batch_size, self.input_layer_size_))
+            self._categorical_msks_values \
+                = self._categorical_msks_values.astype(bool)
 
             # Finally set the default indices and mask.
             self._default_indices = np.array(list(def_indices), dtype=int)
@@ -509,6 +525,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 self._default_msk_values[:, self._default_indices] = 1
             else:
                 self._default_indices = None
+            self._default_msk_values = self._default_msk_values.astype(bool)
 
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily

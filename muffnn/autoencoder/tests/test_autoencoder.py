@@ -200,7 +200,7 @@ def test_errors_metric_output_activation():
 
 def _check_ae(max_score,
               hidden_units=(1,),
-              dropout=0.0,
+              dropout=None,
               learning_rate=1e-1,
               sparse_type=None,
               bin_inds=None,
@@ -305,7 +305,7 @@ def _check_ae(max_score,
     if cat_size is not None:
         for begin, size in zip(cat_begin, cat_size):
             assert_array_almost_equal(
-                np.sum(Xdec[:, begin: begin + size], axis=1), 1.0)
+                np.sum(Xdec[:, begin: begin + size], axis=1), 1.0, decimal=5)
 
     # Compute and test the scores.
     scores = 0.0
@@ -472,7 +472,7 @@ def test_cross_entropy_or_binary():
 
     # All scores should be equal.
     for score in scores:
-        assert_almost_equal(score, scores[0])
+        assert_almost_equal(score, scores[0], decimal=5)
 
 
 def test_cat_single_hidden_unit():
