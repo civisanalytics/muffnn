@@ -504,21 +504,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                                    self._softmax_indices[:, 1]):
                 softmax_set |= set(range(begin, begin + size))
 
-        default_set = set()
-        if self._default_indices is not None:
-            default_set = set(self._default_indices.tolist())
-
         if not sigmoid_set.isdisjoint(softmax_set):
             raise ValueError("Sigmoid indices and softmax indices cannot"
                              " overlap!")
-
-        if not sigmoid_set.isdisjoint(default_set):
-            raise ValueError("Sigmoid indices and default indices cannot"
-                             " overlap. This is a bug!")
-
-        if not softmax_set.isdisjoint(default_set):
-            raise ValueError("Softmax indices and default indices cannot"
-                             " overlap. This is a bug!")
 
     def partial_fit(self, X, y=None):
         """Fit the autoencoder on a batch of training data.
