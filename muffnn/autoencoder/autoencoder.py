@@ -40,7 +40,6 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         fitting.
     dropout : float or None, optional
         The dropout probability. If None, then dropout will not be used.
-        Note that dropout is not applied to the input layer.
     hidden_activation : tensorflow graph operation, optional
         The activation function for the hidden layers and encoding layer.
         See `tensorflow.nn` for various options.
@@ -426,36 +425,100 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Add fitted attributes if the model has been fitted.
         if self._is_fitted:
-            state['input_layer_size_'] = self.input_layer_size_
-            state['_sigmoid_indices'] = self._sigmoid_indices
-            state['_softmax_indices'] = self._softmax_indices
-            state['_sigmoid_msk_values'] = self._sigmoid_msk_values
-            state['_default_msk_values'] = self._default_msk_values
-            state['_softmax_msks_values'] = self._softmax_msks_values
-            state['_random_state'] = self._random_state
+            state.update(dict(input_layer_size_=self.input_layer_size_,
+                              _sigmoid_indices=self._sigmoid_indices,
+                              _softmax_indices=self._softmax_indices,
+                              _sigmoid_msk_values=self._sigmoid_msk_values,
+                              _default_msk_values=self._default_msk_values,
+                              _softmax_msks_values=self._softmax_msks_values,
+                              _random_state=self._random_state))
 
         return state
 
-    def fit(self, X, y=None):
-        """Fit the autoencoder.
+    def _build_sigmoid_and_softmax_indices(self):
+        """Construct and error check sigmoid and softmax indices.
 
-        Parameters
-        ----------
-        X : numpy array or sparse matrix of shape [n_samples, n_features]
-            Training data
-
-        Returns
-        -------
-        self : returns an instance of self.
+        Raises an error if any entry in the feature space is marked as both
+        sigmoid and softmax.
         """
-        _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
+        # Indices for default loss, used for updates in building
+        # the output layer and loss.
+        def_indices = set(range(self.input_layer_size_))
 
-        # Mark the model as not fitted (i.e., not fully initialized based on
-        # the data).
-        self._is_fitted = False
+        # Sigmoid indices.
+        self._sigmoid_indices = (np.atleast_1d(self.sigmoid_indices)
+                                 if self.sigmoid_indices is not None
+                                 else None)
+        self._sigmoid_msk_values \
+            = np.zeros((self.batch_size, self.input_layer_size_))
+        if self._sigmoid_indices is not None:
+            def_indices -= set(self._sigmoid_indices.tolist())
+            self._sigmoid_msk_values[:, self._sigmoid_indices] = 1
+        self._sigmoid_msk_values = self._sigmoid_msk_values.astype(bool)
 
-        # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X)
+        # Softmax indices.
+        if self.softmax_indices is not None:
+            self._softmax_indices \
+                = np.atleast_2d(self.softmax_indices)
+
+            self._softmax_msks_values = []
+            for begin, size in zip(self._softmax_indices[:, 0],
+                                   self._softmax_indices[:, 1]):
+                # Remove softmax stuff from def_indices.
+                def_indices -= set(range(begin, begin + size))
+
+                # Keep track of the mask.
+                msk = np.zeros((self.batch_size, self.input_layer_size_))
+                msk[:, range(begin, begin + size)] = 1
+                self._softmax_msks_values.append(msk)
+
+            self._softmax_msks_values \
+                = np.array(self._softmax_msks_values)
+        else:
+            self._softmax_indices = None
+            self._softmax_msks_values \
+                = np.empty((1, self.batch_size, self.input_layer_size_))
+        self._softmax_msks_values \
+            = self._softmax_msks_values.astype(bool)
+
+        # Default indices.
+        self._default_indices = np.array(list(def_indices), dtype=int)
+        self._default_msk_values \
+            = np.zeros((self.batch_size, self.input_layer_size_))
+        if len(self._default_indices) > 0:
+            self._default_msk_values[:, self._default_indices] = 1
+        else:
+            self._default_indices = None
+        self._default_msk_values = self._default_msk_values.astype(bool)
+
+        # Error check the results.
+        # We rebuild the sets here to error check the code above too.
+        # Always play good defense.
+        sigmoid_set = set()
+        if self._sigmoid_indices is not None:
+            sigmoid_set = set(self._sigmoid_indices.tolist())
+
+        softmax_set = set()
+        if self._softmax_indices is not None:
+            for begin, size in zip(self._softmax_indices[:, 0],
+                                   self._softmax_indices[:, 1]):
+                softmax_set |= set(range(begin, begin + size))
+
+        default_set = set()
+        if self._default_indices is not None:
+            default_set = set(self._default_indices.tolist())
+
+        if not sigmoid_set.isdisjoint(softmax_set):
+            raise ValueError("Sigmoid indices and softmax indices cannot"
+                             " overlap!")
+
+        if not sigmoid_set.isdisjoint(default_set):
+            raise ValueError("Sigmoid indices and default indices cannot"
+                             " overlap. This is a bug!")
+
+        if not softmax_set.isdisjoint(default_set):
+            raise ValueError("Softmax indices and default indices cannot"
+                             " overlap. This is a bug!")
 
     def partial_fit(self, X, y=None):
         """Fit the autoencoder on a batch of training data.
@@ -483,55 +546,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             self.input_layer_size_ = X.shape[1]
 
-            # Indices for default loss, used for updates in building
-            # the output layer and loss.
-            def_indices = set(range(X.shape[1]))
-
-            # Check and set sigmoid and softmax indices.
-            self._sigmoid_indices = (np.atleast_1d(self.sigmoid_indices)
-                                     if self.sigmoid_indices is not None
-                                     else None)
-
-            self._sigmoid_msk_values \
-                = np.zeros((self.batch_size, self.input_layer_size_))
-            if self._sigmoid_indices is not None:
-                def_indices -= set(self._sigmoid_indices.tolist())
-                self._sigmoid_msk_values[:, self._sigmoid_indices] = 1
-            self._sigmoid_msk_values = self._sigmoid_msk_values.astype(bool)
-
-            if self.softmax_indices is not None:
-                self._softmax_indices \
-                    = np.atleast_2d(self.softmax_indices)
-
-                self._softmax_msks_values = []
-                for begin, size in zip(self._softmax_indices[:, 0],
-                                       self._softmax_indices[:, 1]):
-                    # Remove softmax stuff from def_indices.
-                    def_indices -= set(range(begin, begin + size))
-
-                    # Keep track of the mask.
-                    msk = np.zeros((self.batch_size, self.input_layer_size_))
-                    msk[:, range(begin, begin + size)] = 1
-                    self._softmax_msks_values.append(msk)
-
-                self._softmax_msks_values \
-                    = np.array(self._softmax_msks_values)
-            else:
-                self._softmax_indices = None
-                self._softmax_msks_values \
-                    = np.empty((1, self.batch_size, self.input_layer_size_))
-            self._softmax_msks_values \
-                = self._softmax_msks_values.astype(bool)
-
-            # Finally set the default indices and mask.
-            self._default_indices = np.array(list(def_indices), dtype=int)
-            self._default_msk_values \
-                = np.zeros((self.batch_size, self.input_layer_size_))
-            if len(self._default_indices) > 0:
-                self._default_msk_values[:, self._default_indices] = 1
-            else:
-                self._default_indices = None
-            self._default_msk_values = self._default_msk_values.astype(bool)
+            self._build_sigmoid_and_softmax_indices()
 
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
@@ -579,6 +594,27 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     self._random_state.shuffle(indices)
 
         return self
+
+    def fit(self, X, y=None):
+        """Fit the autoencoder.
+
+        Parameters
+        ----------
+        X : numpy array or sparse matrix of shape [n_samples, n_features]
+            Training data
+
+        Returns
+        -------
+        self : returns an instance of self.
+        """
+        _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
+
+        # Mark the model as not fitted (i.e., not fully initialized based on
+        # the data).
+        self._is_fitted = False
+
+        # Call partial fit, which will initialize and then train the model.
+        return self.partial_fit(X)
 
     def transform(self, X, y=None):
         """Encode data with the autoencoder.

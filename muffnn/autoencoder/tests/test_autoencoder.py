@@ -143,6 +143,22 @@ def test_refitting():
                                        "the Autoencoder!")
 
 
+def test_errors_overlapping_sigmoid_softmax_indixes():
+    """Make overlapping sigmoid and softmax indices raises an error."""
+
+    # This data will not actually be fit.
+    # I am just using it to call the `fit` method.
+    X = np.ones((1000, 4))
+
+    ae = Autoencoder(loss='blah',
+                     sigmoid_indices=[0],
+                     softmax_indices=[[0, 2]])
+    with pytest.raises(ValueError) as e:
+        ae.fit(X)
+        assert "Sigmoid indices and softmax indices" in str(e), (
+            "Wrong error raised for overlapping sigmoid and softmax indices")
+
+
 def test_errors_unallowed_loss():
     """Make sure unallowed losses cause an error."""
 
