@@ -15,7 +15,8 @@ from sklearn.utils.multiclass import type_of_target
 
 import tensorflow as tf
 from tensorflow.python.ops import nn
-from muffnn.base import MLPBaseEstimator, _affine
+from muffnn.mlp.base import MLPBaseEstimator
+from muffnn.core import affine
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -94,11 +95,11 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             output_size = 1
 
         if self.is_sparse_ and not self.hidden_units:
-            t = _affine(t, output_size, input_sz=self.input_layer_sz_,
-                        scope='output_layer', sparse_input=True)
+            t = affine(t, output_size, input_size=self.input_layer_sz_,
+                       scope='output_layer', sparse_input=True)
         else:
             t = tf.nn.dropout(t, keep_prob=self._dropout)
-            t = _affine(t, output_size, scope='output_layer')
+            t = affine(t, output_size, scope='output_layer')
 
         if self.multilabel_:
             self.input_targets_ = \

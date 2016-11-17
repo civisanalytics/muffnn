@@ -23,38 +23,12 @@ from sklearn.utils.validation import NotFittedError
 
 import tensorflow as tf
 from tensorflow.python.framework.ops import Graph
-from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.framework import random_seed as tf_random_seed
-from tensorflow.python.ops import init_ops
 
-from .tfbase import TFPicklingBase
+from muffnn.core import TFPicklingBase, affine
 
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _affine(input_tensor, output_size, bias=True, bias_start=0.0,
-            input_sz=None, scope="affine", sparse_input=False):
-    # loosely based on tensorflow.python.ops.rnn_cell.linear.
-
-    # The input size is needed for sparse matrices.
-    if input_sz is None:
-        input_sz = input_tensor.get_shape().as_list()[1]
-
-    with vs.variable_scope(scope):
-        W_0 = vs.get_variable(
-            "weights0",
-            [input_sz, output_size])
-        matmul = tf.sparse_tensor_dense_matmul if sparse_input else tf.matmul
-        t = matmul(input_tensor, W_0)
-
-        if bias:
-            b_0 = vs.get_variable(
-                "bias0",
-                [output_size],
-                initializer=init_ops.constant_initializer(bias_start))
-            t = tf.add(t, b_0)
-    return t
 
 
 class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
@@ -245,11 +219,11 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Hidden layers.
         for i, layer_sz in enumerate(self.hidden_units):
             if self.is_sparse_ and i == 0:
-                t = _affine(t, layer_sz, input_sz=self.input_layer_sz_,
-                            scope='layer_%d' % i, sparse_input=True)
+                t = affine(t, layer_sz, input_size=self.input_layer_sz_,
+                           scope='layer_%d' % i, sparse_input=True)
             else:
                 t = tf.nn.dropout(t, keep_prob=self._dropout)
-                t = _affine(t, layer_sz, scope='layer_%d' % i)
+                t = affine(t, layer_sz, scope='layer_%d' % i)
             t = t if self.activation is None else self.activation(t)
 
         # The output layer and objective function depend on the model
