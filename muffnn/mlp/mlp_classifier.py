@@ -126,7 +126,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t, tf.cast(self.input_targets_, np.float32))
         self._obj_func = tf.reduce_mean(cross_entropy)
 
-    def partial_fit(self, X, y, classes=None):
+    def partial_fit(self, X, y, monitor=None, classes=None):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -139,6 +139,15 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             Classes to be used across calls to partial_fit.  If not set in the
             first call, it will be inferred from the given targets. If
             subsequent calls include additional classes, they will fail.
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -149,7 +158,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         This is based on
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
-        return super().partial_fit(X, y, classes=classes)
+        return super().partial_fit(X, y, monitor=monitor, classes=classes)
 
     def _is_multilabel(self, y):
         """

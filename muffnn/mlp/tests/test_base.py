@@ -5,7 +5,7 @@ import scipy.sparse
 import tensorflow as tf
 from tensorflow.python.ops import nn
 
-import civistext.mlp.base as base
+import muffnn.mlp.base as base
 
 
 class TestEstimator(base.MLPBaseEstimator):
@@ -13,7 +13,8 @@ class TestEstimator(base.MLPBaseEstimator):
     _input_indices = 'input_indices'
     _input_values = 'input_values'
     _input_shape = 'input_shape'
-    input_labels_ = 'input_labels'
+    input_targets_ = 'input_targets'
+    _dropout = 1.0
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  dropout=None, activation=nn.relu, init_scale=0.1,
@@ -27,8 +28,8 @@ class TestEstimator(base.MLPBaseEstimator):
         self.random_state = random_state
         self.monitor = monitor
 
-    def _init_model_output(self, t, _):
-        self.input_labels_ = tf.placeholder(tf.int64, [None], "labels")
+    def _init_model_output(self, t):
+        self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
         self.output_layer_ = tf.nn.softmax(t)
         return t
 
@@ -37,8 +38,9 @@ class TestEstimator(base.MLPBaseEstimator):
 
     def _init_model_objective_fn(self, t):
         cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            t, self.input_labels_)
+            t, self.input_targets_)
         self._obj_func = tf.reduce_mean(cross_entropy)
+
 
 def test_make_feed_dict_csr():
     X = scipy.sparse.csr_matrix((
@@ -52,7 +54,7 @@ def test_make_feed_dict_csr():
 
     feed_dict = clf._make_feed_dict(X, y)
     assert_feed_dict_equals(feed_dict, X)
-    np.testing.assert_array_equal(feed_dict['input_labels'], y)
+    np.testing.assert_array_equal(feed_dict['input_targets'], y)
 
 
 def test_make_feed_dict_other():
@@ -67,7 +69,7 @@ def test_make_feed_dict_other():
 
     feed_dict = clf._make_feed_dict(X, y)
     assert_feed_dict_equals(feed_dict, X)
-    np.testing.assert_array_equal(feed_dict['input_labels'], y)
+    np.testing.assert_array_equal(feed_dict['input_targets'], y)
 
 
 @unittest.mock.patch.object(base.tf, 'Session')
