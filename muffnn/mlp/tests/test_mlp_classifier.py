@@ -29,9 +29,9 @@ X = [[-1, 0], [0, 1], [1, 1]]
 X_sp = sp.csr_matrix(X)
 Y1 = [0, 1, 1]
 Y2 = [2, 1, 0]
-Y_multilabel = np.array([[0, 1],
-                         [1, 1],
-                         [1, 0]])
+Y_multilabel = np.array([[0, 1, 0],
+                         [1, 1, 0],
+                         [1, 0, 1]])
 
 # The defaults kwargs don't work for tiny datasets like those in these tests.
 KWARGS = {"random_state": 0, "n_epochs": 100, "batch_size": 1}
