@@ -85,7 +85,6 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         self.random_state = random_state
 
     def _init_model_output(self, t):
-        n_classes = len(self.classes_)
 
         if self.multilabel_:
             output_size = self.n_classes_
