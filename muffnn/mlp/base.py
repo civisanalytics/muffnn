@@ -259,12 +259,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Make the dictionary mapping tensor placeholders to input data.
 
         if self.is_sparse_:
-            # TF's sparse matrix is initialized by DoK data.
-            X = X.todok()
-            # Make sure the input is a 2-d array.
-            indices = np.array(list(X.keys()) if X.nnz > 0
-                               else np.zeros((0, 2)))
-            values = np.array(list(X.values()))
+            indices, values = _sparse_matrix_data(X)
 
             feed_dict = {
                 self._input_indices: indices,
@@ -321,3 +316,51 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     @abstractmethod
     def predict(self, X):
         pass
+
+
+def _sparse_matrix_data(X):
+    """Prepare the sparse matrix for conversion to TensorFlow.
+
+    Parameters
+    ----------
+    X : sparse matrix
+
+    Returns
+    -------
+    indices : numpy array with shape (X.nnz, 2)
+              describing the indices with values in X.
+    values : numpy array with shape (X.nnz)
+             describing the values at each index
+    """
+    if sp.isspmatrix_csr(X):
+        return _csr_data(X)
+    else:
+        return _csr_data(X.tocsr())
+
+
+def _csr_data(X):
+    """Prepare the CSR sparse matrix for conversion to TensorFlow.
+
+    Parameters
+    ----------
+    X : sparse matrix in CSR format
+
+    Returns
+    -------
+    indices : numpy array with shape (X.nnz, 2)
+              describing the indices with values in X.
+    values : numpy array with shape (X.nnz)
+             describing the values at each index
+    """
+    indices = np.zeros((X.nnz, 2))
+    values = np.zeros(X.nnz)
+    i = 0
+    for row_idx in range(X.shape[0]):
+        column_indices = X.indices[X.indptr[row_idx]: X.indptr[row_idx + 1]]
+        row_values = X.data[X.indptr[row_idx]: X.indptr[row_idx + 1]]
+        for column_idx, row_value in zip(column_indices, row_values):
+            indices[i][0] = row_idx
+            indices[i][1] = column_idx
+            values[i] = row_value
+            i += 1
+    return indices, values
