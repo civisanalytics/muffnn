@@ -143,11 +143,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # scores. TensorFlow does not support scatter operations into Tesnors
         # (i.e., the results of TF graph operations). Thus we use masks to
         # place the right data in the right spot.
-        # The masks are `1` where the data should be and `0` otherwise.
-        # Thus you can do things like
-        # `data_new = msk * tf.exp(data) + (1 - msk) * data`
-        # to compute `tf.exp` of just a part of the data where the masks
-        # are `1`.
+        # The masks are type `tf.bool` to be used with `tf.select`.
         self._default_msk = tf.placeholder(tf.bool,
                                            [None, self.input_layer_size_],
                                            "default_msk")
