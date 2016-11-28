@@ -165,7 +165,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Fan in layers.
         for i, layer_sz in enumerate(self.hidden_units):
-            t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, layer_sz, scope='layer_%d' % i)
             if self.hidden_activation is not None:
                 t = self.hidden_activation(t)
@@ -177,7 +178,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         second_layers \
             = list(self.hidden_units[::-1][1:]) + [self.input_layer_size_]
         for i, layer_sz in enumerate(second_layers):
-            t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t,
                        layer_sz,
                        scope='layer_%d' % (i + len(self.hidden_units)))

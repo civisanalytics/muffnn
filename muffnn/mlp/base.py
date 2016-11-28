@@ -244,7 +244,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 t = affine(t, layer_sz, input_size=self.input_layer_sz_,
                            scope='layer_%d' % i, sparse_input=True)
             else:
-                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+                if self.keep_prob != 1.0:
+                    t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
             t = t if self.activation is None else self.activation(t)
 
