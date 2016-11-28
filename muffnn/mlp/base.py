@@ -201,6 +201,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         if self._is_fitted:
             state['input_layer_sz_'] = self.input_layer_sz_
             state['is_sparse_'] = self.is_sparse_
+            state['_random_state'] = self._random_state
 
         return state
 
