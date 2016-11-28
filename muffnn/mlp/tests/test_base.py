@@ -117,3 +117,35 @@ def assert_feed_dict_equals(feed_dict, matrix):
         (feed_dict['input_values'], indices), shape=feed_dict['input_shape'])
 
     np.testing.assert_array_equal(matrix.toarray(), result_matrix.toarray())
+
+
+def test_partial_fit_random_state():
+    """Ensure partial_fit doesn't reset the random state used for shuffling.
+
+    Mock the feed dict function so as to see which examples get fed into the
+    TensorFlow graph. The examples are shuffled by the random state instance,
+    so the ordering should differ in successive `partial_fit` calls.
+
+    Note that the first `partial_fit` call will use the random state to set
+    TensorFlow's seed in addition to shuffling examples, so we'll check the
+    result of multiple `partial_fit` calls.
+    """
+
+    # Make data long enough that coincidental ordering matches are unlikely.
+    y = np.arange(50)
+    X = np.expand_dims(y, 1)
+
+    clf = TestEstimator(random_state=42, n_epochs=1)
+    clf.is_sparse_ = False
+
+    mock_make_feed_dict = unittest.mock.MagicMock()
+    mock_make_feed_dict.side_effect = clf._make_feed_dict
+    clf._make_feed_dict = mock_make_feed_dict
+
+    n_calls = 50
+    for _ in range(n_calls):
+        clf.partial_fit(X, y)
+
+    unique_orderings = {tuple(x[0][1]) for x
+                        in mock_make_feed_dict.call_args_list}
+    assert len(unique_orderings) == n_calls
