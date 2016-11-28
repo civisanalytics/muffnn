@@ -192,7 +192,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Add attributes of this estimator
         state.update(dict(activation=self.activation,
                           batch_size=self.batch_size,
-                          dropout=self.dropout,
+                          keep_prob=self.keep_prob,
                           hidden_units=self.hidden_units,
                           init_scale=self.init_scale,
                           random_state=self.random_state,
@@ -218,8 +218,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         """Initialize TF objects (needed before fitting or restoring)."""
 
         # A placeholder to control dropout for training vs. prediction.
-        self._dropout = \
-            tf.placeholder(dtype=np.float32, shape=(), name="dropout")
+        self._keep_prob = \
+            tf.placeholder(dtype=np.float32, shape=(), name="keep_prob")
 
         # Input layers.
         if self.is_sparse_:
@@ -244,7 +244,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 t = affine(t, layer_sz, input_size=self.input_layer_sz_,
                            scope='layer_%d' % i, sparse_input=True)
             else:
-                t = tf.nn.dropout(t, keep_prob=self._dropout)
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
             t = t if self.activation is None else self.activation(t)
 
@@ -274,11 +274,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         if y is None:
             # If y is None, then we are doing prediction and should fix
             # dropout.
-            feed_dict[self._dropout] = 1.0
+            feed_dict[self._keep_prob] = 1.0
         else:
             feed_dict[self.input_targets_] = y
-            feed_dict[self._dropout] = \
-                self.dropout if self.dropout is not None else 1.0
+            feed_dict[self._keep_prob] = self.keep_prob
 
         return feed_dict
 

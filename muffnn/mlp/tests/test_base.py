@@ -14,15 +14,15 @@ class TestEstimator(base.MLPBaseEstimator):
     _input_values = 'input_values'
     _input_shape = 'input_shape'
     input_targets_ = 'input_targets'
-    _dropout = 1.0
+    _keep_prob = 1.0
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
-                 dropout=None, activation=nn.relu, init_scale=0.1,
+                 keep_prob=1.0, activation=nn.relu, init_scale=0.1,
                  random_state=None, monitor=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.dropout = dropout
+        self.keep_prob = keep_prob
         self.activation = activation
         self.init_scale = init_scale
         self.random_state = random_state

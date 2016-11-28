@@ -84,7 +84,7 @@ def test_persistence():
                      n_epochs=1000,
                      random_state=4556,
                      learning_rate=1e-2,
-                     dropout=0.0)
+                     keep_prob=1.0)
     Xenc = ae.fit_transform(X)
 
     b = BytesIO()
@@ -103,14 +103,14 @@ def test_replicability():
                       n_epochs=1000,
                       random_state=4556,
                       learning_rate=1e-2,
-                      dropout=0.0)
+                      keep_prob=1.0)
     Xenc1 = ae1.fit_transform(X)
 
     ae2 = Autoencoder(hidden_units=(1,),
                       n_epochs=1000,
                       random_state=4556,
                       learning_rate=1e-2,
-                      dropout=0.0)
+                      keep_prob=1.0)
     Xenc2 = ae2.fit_transform(X)
 
     assert_array_almost_equal(Xenc1, Xenc2)
@@ -130,7 +130,7 @@ def test_refitting():
                      n_epochs=1000,
                      random_state=4556,
                      learning_rate=1e-2,
-                     dropout=0.0,
+                     keep_prob=1.0,
                      loss='cross-entropy')
     ae.fit(X)
     assert ae.input_layer_size_ == 4, ("Input layer is the wrong size for "
@@ -216,7 +216,7 @@ def test_errors_loss_output_activation():
 
 def _check_ae(max_score,
               hidden_units=(1,),
-              dropout=None,
+              keep_prob=1.0,
               learning_rate=1e-1,
               sparse_type=None,
               bin_inds=None,
@@ -301,7 +301,7 @@ def _check_ae(max_score,
                      n_epochs=n_epochs,
                      random_state=4556,
                      learning_rate=learning_rate,
-                     dropout=dropout,
+                     keep_prob=keep_prob,
                      loss=loss,
                      sigmoid_indices=bin_inds_to_use,
                      softmax_indices=cat_indices)
@@ -383,12 +383,12 @@ def test_mse_dropout():
     """Test the MSE loss w/ dropout."""
     ae_score_dropout = _check_ae(MSE_MAX_SCORE,
                                  hidden_units=(20, 20, 10, 10, 2),
-                                 dropout=0.05,
+                                 keep_prob=0.95,
                                  learning_rate=1e-3)
 
     ae_score_nodropout = _check_ae(MSE_MAX_SCORE,
                                    hidden_units=(20, 20, 10, 10, 2),
-                                   dropout=0.0,
+                                   keep_prob=1.0,
                                    learning_rate=1e-3)
 
     assert ae_score_nodropout < ae_score_dropout, ("MSE with dropout should "
@@ -420,7 +420,7 @@ def test_sigmoid_softmax_cross_entropy_loss_single_hidden_unit():
                          n_epochs=5000,
                          random_state=4556,
                          learning_rate=1e-1,
-                         dropout=0.0,
+                         keep_prob=1.0,
                          loss='cross-entropy',
                          output_activation=tf.nn.softmax,
                          sigmoid_indices=binary_indices)
