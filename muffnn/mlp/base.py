@@ -44,7 +44,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # fitting a classifier.
         return y
 
-    def fit(self, X, y):
+    def fit(self, X, y, monitor=None):
         """Fit the model.
 
         Parameters
@@ -53,6 +53,15 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
             Training data
         y : numpy array of shape [n_samples, n_targets]
             Target values
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -65,14 +74,14 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X, y)
+        return self.partial_fit(X, y, monitor=monitor)
 
     def _fit_targets(self, y):
         # This can be overwritten to set instance variables that pertain to the
         # targets (e.g., an array of class labels).
         pass
 
-    def partial_fit(self, X, y, **kwargs):
+    def partial_fit(self, X, y, monitor=None, **kwargs):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -81,6 +90,15 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
             Training data
         y : numpy array of shape [n_samples, n_targets]
             Target values
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -124,26 +142,30 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Train the model with the given data.
         with self.graph_.as_default():
             n_examples = X.shape[0]
-            start_idx = 0
-            epoch = 0
             indices = np.arange(n_examples)
             random_state.shuffle(indices)
 
-            while True:
-                batch_ind = indices[start_idx:start_idx + self.batch_size]
-                feed_dict = self._make_feed_dict(X[batch_ind],
-                                                 y[batch_ind])
-                obj_val, _ = self._session.run(
-                    [self._obj_func, self._train_step], feed_dict=feed_dict)
+            for epoch in range(self.n_epochs):
+                random_state.shuffle(indices)
+                for start_idx in range(0, n_examples, self.batch_size):
+                    batch_ind = indices[start_idx:start_idx + self.batch_size]
+                    feed_dict = self._make_feed_dict(X[batch_ind],
+                                                     y[batch_ind])
+                    obj_val, _ = self._session.run(
+                        [self._obj_func, self._train_step],
+                        feed_dict=feed_dict)
+                    _LOGGER.debug("objective: %.4f, epoch: %d, idx: %d",
+                                  obj_val, epoch, start_idx)
+
                 _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
                              obj_val, epoch, start_idx)
-                start_idx += self.batch_size
-                if start_idx > n_examples - self.batch_size:
-                    start_idx = 0
-                    epoch += 1
-                    if epoch >= self.n_epochs:
-                        break
-                    random_state.shuffle(indices)
+
+                if monitor:
+                    stop_early = monitor(epoch, self, {'loss': obj_val})
+                    if stop_early:
+                        _LOGGER.info(
+                            "stopping early due to monitor function.")
+                        return self
 
         return self
 
@@ -237,12 +259,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Make the dictionary mapping tensor placeholders to input data.
 
         if self.is_sparse_:
-            # TF's sparse matrix is initialized by DoK data.
-            X = X.todok()
-            # Make sure the input is a 2-d array.
-            indices = np.array(list(X.keys()) if X.nnz > 0
-                               else np.zeros((0, 2)))
-            values = np.array(list(X.values()))
+            indices, values = _sparse_matrix_data(X)
 
             feed_dict = {
                 self._input_indices: indices,
@@ -299,3 +316,51 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     @abstractmethod
     def predict(self, X):
         pass
+
+
+def _sparse_matrix_data(X):
+    """Prepare the sparse matrix for conversion to TensorFlow.
+
+    Parameters
+    ----------
+    X : sparse matrix
+
+    Returns
+    -------
+    indices : numpy array with shape (X.nnz, 2)
+              describing the indices with values in X.
+    values : numpy array with shape (X.nnz)
+             describing the values at each index
+    """
+    if sp.isspmatrix_csr(X):
+        return _csr_data(X)
+    else:
+        return _csr_data(X.tocsr())
+
+
+def _csr_data(X):
+    """Prepare the CSR sparse matrix for conversion to TensorFlow.
+
+    Parameters
+    ----------
+    X : sparse matrix in CSR format
+
+    Returns
+    -------
+    indices : numpy array with shape (X.nnz, 2)
+              describing the indices with values in X.
+    values : numpy array with shape (X.nnz)
+             describing the values at each index
+    """
+    indices = np.zeros((X.nnz, 2))
+    values = np.zeros(X.nnz)
+    i = 0
+    for row_idx in range(X.shape[0]):
+        column_indices = X.indices[X.indptr[row_idx]: X.indptr[row_idx + 1]]
+        row_values = X.data[X.indptr[row_idx]: X.indptr[row_idx + 1]]
+        for column_idx, row_value in zip(column_indices, row_values):
+            indices[i][0] = row_idx
+            indices[i][1] = column_idx
+            values[i] = row_value
+            i += 1
+    return indices, values

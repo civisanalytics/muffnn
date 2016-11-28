@@ -85,12 +85,11 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         self.random_state = random_state
 
     def _init_model_output(self, t):
-        n_classes = len(self.classes_)
 
         if self.multilabel_:
-            output_size = n_classes
-        elif n_classes > 2:
-            output_size = n_classes
+            output_size = self.n_classes_
+        elif self.n_classes_ > 2:
+            output_size = self.n_classes_
         else:
             output_size = 1
 
@@ -103,9 +102,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self.input_targets_ = \
-                tf.placeholder(tf.int64, [None, n_classes], "targets")
+                tf.placeholder(tf.int64, [None, self.n_classes_], "labels")
             self.output_layer_ = tf.nn.sigmoid(t)
-        elif n_classes > 2:
+        elif self.n_classes_ > 2:
             self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
             self.output_layer_ = tf.nn.softmax(t)
         else:
@@ -115,11 +114,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         return t
 
     def _init_model_objective_fn(self, t):
-        n_classes = len(self.classes_)
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
-        elif n_classes > 2:
+        elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 t, self.input_targets_)
         else:
@@ -127,7 +125,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t, tf.cast(self.input_targets_, np.float32))
         self._obj_func = tf.reduce_mean(cross_entropy)
 
-    def partial_fit(self, X, y, classes=None):
+    def partial_fit(self, X, y, monitor=None, classes=None):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -140,6 +138,15 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             Classes to be used across calls to partial_fit.  If not set in the
             first call, it will be inferred from the given targets. If
             subsequent calls include additional classes, they will fail.
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -150,7 +157,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         This is based on
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
-        return super().partial_fit(X, y, classes=classes)
+        return super().partial_fit(X, y, monitor=monitor, classes=classes)
 
     def _is_multilabel(self, y):
         """
@@ -179,9 +186,11 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         if self.multilabel_:
             self._enc = None
             self.classes_ = np.array([0, 1])
+            self.n_classes_ = y.shape[1]
         else:
             self._enc = LabelEncoder().fit(y)
             self.classes_ = self._enc.classes_
+            self.n_classes_ = len(self.classes_)
 
     def _transform_targets(self, y):
         return y if self.multilabel_ else self._enc.transform(y)
@@ -240,5 +249,6 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             state['_enc'] = self.classes_
             state['classes_'] = self.classes_
             state['multilabel_'] = self.multilabel_
+            state['n_classes_'] = self.n_classes_
 
         return state
