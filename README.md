@@ -20,7 +20,7 @@ pip install .
 Google provides TensorFlow pip wheels for different OSs and architectures.
 See [this page](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#pip-installation)
 for more details.  For Python 3.5 on 64-bit Linux with no GPU, set
-`export TF_BINARY_URL=https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0rc0-cp35-cp35m-linux_x86_64.whl`.
+`export TF_BINARY_URL=https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.11.0-cp35-cp35m-linux_x86_64.whl`
 
 For development, a few additional dependencies are needed:
 
