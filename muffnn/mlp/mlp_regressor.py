@@ -94,7 +94,8 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
             t = affine(t, 1, input_size=self.input_layer_sz_,
                        scope='output_layer', sparse_input=True)
         else:
-            t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, 1, scope='output_layer')
 
         self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")

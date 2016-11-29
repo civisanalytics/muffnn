@@ -99,7 +99,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             t = affine(t, output_size, input_size=self.input_layer_sz_,
                        scope='output_layer', sparse_input=True)
         else:
-            t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, output_size, scope='output_layer')
 
         if self.multilabel_:
