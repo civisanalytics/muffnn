@@ -106,14 +106,13 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         """
 
         X, y = self._check_inputs(X, y)
-
-        random_state = check_random_state(self.random_state)
         assert self.batch_size > 0, "batch_size <= 0"
 
         # Initialize the model if it hasn't been already by a previous call.
         if self._is_fitted:
             y = self._transform_targets(y)
         else:
+            self._random_state = check_random_state(self.random_state)
             self._fit_targets(y, **kwargs)
             y = self._transform_targets(y)
 
@@ -126,7 +125,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
             self.graph_ = Graph()
             with self.graph_.as_default():
                 tf_random_seed.set_random_seed(
-                    random_state.randint(0, 10000000))
+                    self._random_state.randint(0, 10000000))
 
                 tf.get_variable_scope().set_initializer(
                     tf.uniform_unit_scaling_initializer(self.init_scale))
@@ -143,10 +142,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         with self.graph_.as_default():
             n_examples = X.shape[0]
             indices = np.arange(n_examples)
-            random_state.shuffle(indices)
 
             for epoch in range(self.n_epochs):
-                random_state.shuffle(indices)
+                self._random_state.shuffle(indices)
                 for start_idx in range(0, n_examples, self.batch_size):
                     batch_ind = indices[start_idx:start_idx + self.batch_size]
                     feed_dict = self._make_feed_dict(X[batch_ind],
@@ -203,6 +201,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         if self._is_fitted:
             state['input_layer_sz_'] = self.input_layer_sz_
             state['is_sparse_'] = self.is_sparse_
+            state['_random_state'] = self._random_state
 
         return state
 
