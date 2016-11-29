@@ -19,7 +19,7 @@ from sklearn.base import BaseEstimator
 from sklearn.utils import (check_array, check_random_state, check_X_y,
                            DataConversionWarning)
 
-from sklearn.utils.validation import NotFittedError
+from sklearn.exceptions import NotFittedError
 
 import tensorflow as tf
 from tensorflow.python.framework.ops import Graph
