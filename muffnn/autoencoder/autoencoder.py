@@ -38,8 +38,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     n_epochs : int, optional
         The number of epochs (iterations through the training data) when
         fitting.
-    dropout : float or None, optional
-        The dropout probability. If None, then dropout will not be used.
+    keep_prob : float, optional
+        The probability of keeping values in dropout. A value of 1.0 means that
+        dropout will not be used. cf. `TensorFlow documentation
+        <https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dropout>`
     hidden_activation : tensorflow graph operation, optional
         The activation function for the hidden layers and encoding layer.
         See `tensorflow.nn` for various options.
@@ -109,14 +111,14 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     """
 
     def __init__(self, hidden_units=(16,), batch_size=128, n_epochs=5,
-                 dropout=None, hidden_activation=tf.nn.sigmoid,
+                 keep_prob=1.0, hidden_activation=tf.nn.sigmoid,
                  output_activation=tf.nn.sigmoid, random_state=None,
                  learning_rate=1e-3, loss='mse', sigmoid_indices=None,
                  softmax_indices=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.dropout = dropout
+        self.keep_prob = keep_prob
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.random_state = random_state
@@ -129,9 +131,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         """Initialize TF objects (needed before fitting or restoring)."""
 
         # A placeholder to control dropout for training vs. prediction.
-        self._dropout = tf.placeholder(dtype=tf.float32,
-                                       shape=(),
-                                       name="dropout")
+        self._keep_prob = tf.placeholder(dtype=tf.float32,
+                                         shape=(),
+                                         name="keep_prob")
 
         # Input values.
         self._input_values = tf.placeholder(tf.float32,
@@ -159,8 +161,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Fan in layers.
         for i, layer_sz in enumerate(self.hidden_units):
-            if self.dropout is not None:
-                t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, layer_sz, scope='layer_%d' % i)
             if self.hidden_activation is not None:
                 t = self.hidden_activation(t)
@@ -172,8 +174,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         second_layers \
             = list(self.hidden_units[::-1][1:]) + [self.input_layer_size_]
         for i, layer_sz in enumerate(second_layers):
-            if self.dropout is not None:
-                t = tf.nn.dropout(t, keep_prob=1.0 - self._dropout)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t,
                        layer_sz,
                        scope='layer_%d' % (i + len(self.hidden_units)))
@@ -369,12 +371,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         else:
             feed_dict = {self._input_values: X}
 
-        if not training:
-            # If not training, fix the dropout to zero so keep_prob = 1.0.
-            feed_dict[self._dropout] = 0.0
-        else:
-            feed_dict[self._dropout] = \
-                self.dropout if self.dropout is not None else 0.0
+        # If not training, turn off dropout (i.e., set keep_prob = 1.0).
+        feed_dict[self._keep_prob] = self.keep_prob if training else 1.0
 
         feed_dict[self._sigmoid_msk] \
             = self._sigmoid_msk_values[0:X.shape[0], :]
@@ -409,7 +407,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         state.update(dict(hidden_activation=self.hidden_activation,
                           output_activation=self.output_activation,
                           batch_size=self.batch_size,
-                          dropout=self.dropout,
+                          keep_prob=self.keep_prob,
                           hidden_units=self.hidden_units,
                           random_state=self.random_state,
                           n_epochs=self.n_epochs,

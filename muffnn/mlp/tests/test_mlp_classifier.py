@@ -41,10 +41,11 @@ KWARGS = {"random_state": 0, "n_epochs": 100, "batch_size": 1}
 # the toy example tests that have only a handful of examples.
 class MLPClassifierManyEpochs(MLPClassifier):
     def __init__(self, hidden_units=(256,), batch_size=64,
-                 dropout=None, activation=nn.relu, init_scale=0.1):
+                 keep_prob=1.0, activation=nn.relu, init_scale=0.1):
         super().__init__(hidden_units=hidden_units, batch_size=batch_size,
-                         n_epochs=100, dropout=dropout, activation=activation,
-                         init_scale=init_scale, random_state=42)
+                         n_epochs=100, keep_prob=keep_prob,
+                         activation=activation, init_scale=init_scale,
+                         random_state=42)
 
 
 def test_check_estimator():
@@ -89,12 +90,12 @@ def test_feed_dict():
     # https://github.com/tensorflow/tensorflow/blob/2e152ecd67b3c5080f417260bc751e0c6bd7f1d3/tensorflow/python/ops/nn_ops.py#L1081-L1082.
 
     # Instantiate an MLP and mock out things that would be set in fit.
-    mlp = MLPClassifier(dropout=0.5)
+    mlp = MLPClassifier(keep_prob=0.5)
     mlp.input_targets_ = "input_targets"
     mlp._input_indices = "input_indices"
     mlp._input_values = "input_values"
     mlp._input_shape = "input_shape"
-    mlp._dropout = "t_dropout"
+    mlp._keep_prob = "t_keep_prob"
 
     # sparse, targets given for training
     mlp.is_sparse_ = True
@@ -105,36 +106,36 @@ def test_feed_dict():
     y = MagicMock()
     fd = mlp._make_feed_dict(X_sparse, y)
     expected_keys = {'input_shape', 'input_values', 'input_indices',
-                     'input_targets', 't_dropout'}
+                     'input_targets', 't_keep_prob'}
     assert set(fd.keys()) == expected_keys
-    assert fd['t_dropout'] == 0.5
+    assert fd['t_keep_prob'] == 0.5
 
     # sparse, no targets given
     fd = mlp._make_feed_dict(X_sparse)
     expected_keys = {'input_shape', 'input_values', 'input_indices',
-                     't_dropout'}
+                     't_keep_prob'}
     assert set(fd.keys()) == expected_keys
-    assert fd['t_dropout'] == 1.0
+    assert fd['t_keep_prob'] == 1.0
 
     # dense, targets given for training
     mlp.is_sparse_ = False
     X_dense = MagicMock()
     fd = mlp._make_feed_dict(X_dense, y)
-    expected_keys = {'input_values', 't_dropout', 'input_targets'}
+    expected_keys = {'input_values', 't_keep_prob', 'input_targets'}
     assert set(fd.keys()) == expected_keys
-    assert fd['t_dropout'] == 0.5
+    assert fd['t_keep_prob'] == 0.5
 
     # dense, no targets given
     fd = mlp._make_feed_dict(X_dense)
-    expected_keys = {'input_values', 't_dropout'}
+    expected_keys = {'input_values', 't_keep_prob'}
     assert set(fd.keys()) == expected_keys
-    assert fd['t_dropout'] == 1.0
+    assert fd['t_keep_prob'] == 1.0
 
 
 def test_dropout():
     """Test binary classification."""
     # Check that predictions are deterministic.
-    clf = MLPClassifier(dropout=0.5, **KWARGS)
+    clf = MLPClassifier(keep_prob=0.5, **KWARGS)
     clf.fit(X_sp, Y1)
     y_pred1 = clf.predict_proba(X_sp)
     for _ in range(100):
@@ -142,9 +143,9 @@ def test_dropout():
         assert_array_almost_equal(y_pred1, y_pred_i)
 
     check_predictions(
-        MLPClassifier(dropout=0.5, **KWARGS), X, Y1)
+        MLPClassifier(keep_prob=0.5, **KWARGS), X, Y1)
     check_predictions(
-        MLPClassifier(dropout=0.5, **KWARGS), X_sp, Y1)
+        MLPClassifier(keep_prob=0.5, **KWARGS), X_sp, Y1)
 
 
 def test_multiple_layers():
@@ -173,7 +174,7 @@ def test_persistence():
 
 
 def test_replicability():
-    clf = MLPClassifier(dropout=0.5, random_state=42)
+    clf = MLPClassifier(keep_prob=0.5, random_state=42)
     target = iris.target_names[iris.target]
     probs1 = clf.fit(iris.data, target).predict_proba(iris.data)
     probs2 = clf.fit(iris.data, target).predict_proba(iris.data)

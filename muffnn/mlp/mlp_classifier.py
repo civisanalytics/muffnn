@@ -38,8 +38,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     n_epochs : int, optional
         The number of epochs (iterations through the training data) when
         fitting.
-    dropout : float or None, optional
-        The dropout probability.  If None, then dropout will not be used.
+    keep_prob : float, optional
+        The probability of keeping values in dropout. A value of 1.0 means that
+        dropout will not be used. cf. `TensorFlow documentation
+        <https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dropout>`
     activation : callable, optional
         The activation function.  See tensorflow.python.ops.nn.
     init_scale : float, optional
@@ -74,12 +76,12 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     """
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
-                 dropout=None, activation=nn.relu, init_scale=0.1,
+                 keep_prob=1.0, activation=nn.relu, init_scale=0.1,
                  random_state=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.dropout = dropout
+        self.keep_prob = keep_prob
         self.activation = activation
         self.init_scale = init_scale
         self.random_state = random_state
@@ -97,7 +99,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             t = affine(t, output_size, input_size=self.input_layer_sz_,
                        scope='output_layer', sparse_input=True)
         else:
-            t = tf.nn.dropout(t, keep_prob=self._dropout)
+            if self.keep_prob != 1.0:
+                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, output_size, scope='output_layer')
 
         if self.multilabel_:

@@ -43,10 +43,11 @@ def check_predictions(est, X, y):
 # the toy example tests that have only a handful of examples.
 class MLPRegressorManyEpochs(MLPRegressor):
     def __init__(self, hidden_units=(256,), batch_size=64,
-                 dropout=None, activation=nn.relu, init_scale=0.1):
+                 keep_prob=1.0, activation=nn.relu, init_scale=0.1):
         super().__init__(hidden_units=hidden_units, batch_size=batch_size,
-                         n_epochs=100, dropout=dropout, activation=activation,
-                         init_scale=init_scale, random_state=42)
+                         n_epochs=100, keep_prob=keep_prob,
+                         activation=activation, init_scale=init_scale,
+                         random_state=42)
 
 
 def test_check_estimator():
@@ -69,7 +70,7 @@ def test_replicability():
     rng.shuffle(ind)
     X_diabetes, y_diabetes = X_diabetes[ind], y_diabetes[ind]
 
-    clf = MLPRegressor(dropout=0.9, random_state=42, n_epochs=100)
+    clf = MLPRegressor(keep_prob=0.9, random_state=42, n_epochs=100)
     target = y_diabetes
     # Just predict on the training set, for simplicity.
     pred1 = clf.fit(X_diabetes, target).predict(X_diabetes)
