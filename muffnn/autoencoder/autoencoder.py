@@ -170,10 +170,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, layer_sz, scope='layer_%d' % i)
             if (self.hidden_activation is not None and
-                i < len(self.hidden_units) - 1):
+                    i < len(self.hidden_units) - 1):
                 t = self.hidden_activation(t)
             if (self.encoding_activation is not None and
-                        i == len(self.hidden_units) - 1):
+                    i == len(self.hidden_units) - 1):
                 t = self.encoding_activation(t)
 
         # Encoded values.
