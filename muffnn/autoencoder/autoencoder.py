@@ -45,12 +45,15 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     hidden_activation : tensorflow graph operation, optional
         The activation function for the hidden layers.
         See `tensorflow.nn` for various options.
+        None is equivalent to a linear activation.
     encoding_activation : tensorflow graph operation, optional
         The activation function for the encoding layer.
         See `tensorflow.nn` for various options.
+        None is equivalent to a linear activation.
     output_activation : tensorflow graph operation, optional
         The activation function for the output layer.
         See `tensorflow.nn` for various options.
+        None is equivalent to a linear activation.
         If `loss` is set to 'cross-entropy', then only
         `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` are valid
         options.

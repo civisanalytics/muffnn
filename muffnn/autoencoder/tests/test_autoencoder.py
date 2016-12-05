@@ -23,7 +23,8 @@ from muffnn import Autoencoder
 _LOGGER = logging.getLogger(__name__)
 iris = load_iris()
 
-LEARNING_RATE = 2e-3
+# Learning rate for most tests, changed in some places for convergence.
+DEFAULT_LEARNING_RATE = 2e-3
 
 
 def _cross_entropy(ytrue, ypred):
@@ -226,7 +227,7 @@ def test_mse_sigmoid_activations():
     ae = Autoencoder(hidden_units=(3, 2,),
                      n_epochs=7500,
                      random_state=4556,
-                     learning_rate=LEARNING_RATE,
+                     learning_rate=DEFAULT_LEARNING_RATE,
                      keep_prob=1.0,
                      hidden_activation=tf.nn.sigmoid,
                      encoding_activation=tf.nn.sigmoid,
@@ -287,7 +288,7 @@ def test_sigmoid_softmax_cross_entropy_loss():
         ae = Autoencoder(hidden_units=(2,),
                          n_epochs=7500,
                          random_state=4556,
-                         learning_rate=LEARNING_RATE,
+                         learning_rate=DEFAULT_LEARNING_RATE,
                          keep_prob=1.0,
                          loss='cross-entropy',
                          output_activation=tf.nn.softmax,
@@ -426,7 +427,7 @@ def _check_ae(max_score,
         output_activation = None
 
     if learning_rate is None:
-        learning_rate = LEARNING_RATE
+        learning_rate = DEFAULT_LEARNING_RATE
 
     ae = Autoencoder(hidden_units=hidden_units,
                      n_epochs=n_epochs,
@@ -572,7 +573,9 @@ def test_sparse_inputs():
             sparse_type=sparse_type,
             cat_inds=range(4),
             n_epochs=1000,
-            learning_rate=5e-3))
+            learning_rate=5e-3  # Using a higher learning rate
+                                # here for convergence.
+            ))
 
     # All scores should be equal.
     for score in scores:
