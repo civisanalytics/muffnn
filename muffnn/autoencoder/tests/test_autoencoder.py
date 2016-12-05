@@ -23,6 +23,8 @@ from muffnn import Autoencoder
 _LOGGER = logging.getLogger(__name__)
 iris = load_iris()
 
+LEARNING_RATE = 2e-3
+
 
 def _cross_entropy(ytrue, ypred):
     """Compute the cross-entropy for a classifier.
@@ -131,7 +133,8 @@ def test_refitting():
                      random_state=4556,
                      learning_rate=1e-2,
                      keep_prob=1.0,
-                     loss='cross-entropy')
+                     loss='cross-entropy',
+                     output_activation=tf.nn.sigmoid)
     ae.fit(X)
     assert ae.input_layer_size_ == 4, ("Input layer is the wrong size for "
                                        "the Autoencoder!")
@@ -214,15 +217,135 @@ def test_errors_loss_output_activation():
             "output activation that is not allowed for a subset of features!")
 
 
+def test_mse_sigmoid_activations():
+    """Test the MSE loss w/ sigmoid activation."""
+    # Use the iris features.
+    X = iris.data
+    X = MinMaxScaler().fit_transform(X)
+
+    ae = Autoencoder(hidden_units=(3, 2,),
+                     n_epochs=7500,
+                     random_state=4556,
+                     learning_rate=LEARNING_RATE,
+                     keep_prob=1.0,
+                     hidden_activation=tf.nn.sigmoid,
+                     encoding_activation=tf.nn.sigmoid,
+                     output_activation=tf.nn.sigmoid)
+    Xenc = ae.fit_transform(X)
+    Xdec = ae.inverse_transform(Xenc)
+
+    assert Xenc.shape == (X.shape[0], 2), ("Encoded iris data "
+                                           "is not the right"
+                                           " shape!")
+
+    assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
+                                   "shape!")
+
+    # Compute and test the scores.
+    scores = 0.0
+    for i in range(X.shape[1]):
+        scores += np.sum((X[:, i:i+1] - Xdec[:, i:i+1]) ** 2, axis=1)
+
+    ae_scores = ae.score_samples(X)
+    assert_array_almost_equal(scores, ae_scores, decimal=5)
+
+    score = np.mean(scores)
+    ae_score = ae.score(X)
+    assert_almost_equal(score, ae_score, decimal=5)
+
+    max_score = 0.1
+    _LOGGER.warning("\ntest info:\n    ae: %s\n"
+                    "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
+                    str(ae), ae_score,
+                    pprint.pformat(list(X[10]), compact=True),
+                    pprint.pformat(list(Xdec[10]), compact=True))
+
+    assert ae_score < max_score, ("Autoencoder should have a score "
+                                  "less than %f for the iris features." %
+                                  max_score)
+
+
+def test_sigmoid_softmax_cross_entropy_loss():
+    """Test the cross-entropy loss w/ softmax and sigmoid."""
+
+    # Use the iris features.
+    X = iris.data
+    X = MinMaxScaler().fit_transform(X)
+
+    # Make some columns normalized to unity.
+    X = X / np.sum(X, axis=1)[:, np.newaxis]
+
+    for i in range(2):
+        if i == 1:
+            bins = [0.0, np.median(X[:, 0]), 1.1]
+            X[:, 0] = np.digitize(X[:, 0], bins) - 1.0
+            X[:, 1:] = X[:, 1:] / np.sum(X[:, 1:], axis=1)[:, np.newaxis]
+            binary_indices = [0]
+        else:
+            binary_indices = None
+
+        ae = Autoencoder(hidden_units=(2,),
+                         n_epochs=7500,
+                         random_state=4556,
+                         learning_rate=LEARNING_RATE,
+                         keep_prob=1.0,
+                         loss='cross-entropy',
+                         output_activation=tf.nn.softmax,
+                         sigmoid_indices=binary_indices,
+                         hidden_activation=tf.nn.relu,
+                         encoding_activation=None)
+
+        Xenc = ae.fit_transform(X)
+        Xdec = ae.inverse_transform(Xenc)
+
+        assert Xenc.shape == (X.shape[0], 2), ("Encoded iris data is not the "
+                                               "right shape!")
+
+        assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
+                                       "shape!")
+
+        if i == 1:
+            # Softmax stuff should come back out normalized.
+            assert_array_almost_equal(np.sum(Xdec[:, 1:], axis=1), 1.0)
+
+            # Compute and test the scores.
+            scores = _cross_entropy(X[:, 1:], Xdec[:, 1:])
+            scores += _cross_entropy(X[:, 0], Xdec[:, 0])
+
+            ae_scores = ae.score_samples(X)
+            assert_array_almost_equal(scores, ae_scores, decimal=5)
+        else:
+            # Softmax stuff should come back out normalized.
+            assert_array_almost_equal(np.sum(Xdec, axis=1), 1.0)
+
+            # Compute and test the scores.
+            scores = _cross_entropy(X, Xdec)
+            ae_scores = ae.score_samples(X)
+            assert_array_almost_equal(scores, ae_scores, decimal=5)
+
+        score = np.mean(scores)
+        ae_score = ae.score(X)
+        assert_almost_equal(score, ae_score, decimal=5)
+
+        _LOGGER.warning("\ntest info:\n    ae: %s\n"
+                        "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
+                        str(ae), ae_score,
+                        pprint.pformat(list(X[10]), compact=True),
+                        pprint.pformat(list(Xdec[10]), compact=True))
+
+        assert ae_score < 2.5, ("Autoencoder should have a score "
+                                "less than 2.5 for the iris features.")
+
+
 def _check_ae(max_score,
               hidden_units=(1,),
               keep_prob=1.0,
-              learning_rate=1e-1,
+              learning_rate=None,
               sparse_type=None,
               bin_inds=None,
               bin_inds_to_use=None,
               cat_inds=None,
-              n_epochs=5000,
+              n_epochs=7500,
               loss='mse'):
     """Helper function for testing the Autoencoder.
 
@@ -297,6 +420,14 @@ def _check_ae(max_score,
     elif bin_inds_to_use == -1:
         bin_inds_to_use = None
 
+    if loss == 'cross-entropy':
+        output_activation = tf.nn.sigmoid
+    else:
+        output_activation = None
+
+    if learning_rate is None:
+        learning_rate = LEARNING_RATE
+
     ae = Autoencoder(hidden_units=hidden_units,
                      n_epochs=n_epochs,
                      random_state=4556,
@@ -304,7 +435,10 @@ def _check_ae(max_score,
                      keep_prob=keep_prob,
                      loss=loss,
                      sigmoid_indices=bin_inds_to_use,
-                     softmax_indices=cat_indices)
+                     softmax_indices=cat_indices,
+                     hidden_activation=tf.nn.relu,
+                     encoding_activation=None,
+                     output_activation=output_activation)
 
     Xenc = ae.fit_transform(X)
     Xdec = ae.inverse_transform(Xenc)
@@ -396,81 +530,10 @@ def test_mse_dropout():
                                                    " dropout!")
 
 
-def test_sigmoid_softmax_cross_entropy_loss_single_hidden_unit():
-    """Test the cross-entropy loss w/ softmax, sigmoid and a single
-    hidden unit."""
-
-    # Use the iris features.
-    X = iris.data
-    X = MinMaxScaler().fit_transform(X)
-
-    # Make some columns normalized to unity.
-    X = X / np.sum(X, axis=1)[:, np.newaxis]
-
-    for i in range(2):
-        if i == 1:
-            bins = [0.0, np.median(X[:, 0]), 1.1]
-            X[:, 0] = np.digitize(X[:, 0], bins) - 1.0
-            X[:, 1:] = X[:, 1:] / np.sum(X[:, 1:], axis=1)[:, np.newaxis]
-            binary_indices = [0]
-        else:
-            binary_indices = None
-
-        ae = Autoencoder(hidden_units=(1,),
-                         n_epochs=5000,
-                         random_state=4556,
-                         learning_rate=1e-1,
-                         keep_prob=1.0,
-                         loss='cross-entropy',
-                         output_activation=tf.nn.softmax,
-                         sigmoid_indices=binary_indices)
-
-        Xenc = ae.fit_transform(X)
-        Xdec = ae.inverse_transform(Xenc)
-
-        assert Xenc.shape == (X.shape[0], 1), ("Encoded iris data is not the "
-                                               "right shape!")
-
-        assert Xdec.shape == X.shape, ("Decoded iris data is not the right "
-                                       "shape!")
-
-        if i == 1:
-            # Softmax stuff should come back out normalized.
-            assert_array_almost_equal(np.sum(Xdec[:, 1:], axis=1), 1.0)
-
-            # Compute and test the scores.
-            scores = _cross_entropy(X[:, 1:], Xdec[:, 1:])
-            scores += _cross_entropy(X[:, 0], Xdec[:, 0])
-
-            ae_scores = ae.score_samples(X)
-            assert_array_almost_equal(scores, ae_scores, decimal=5)
-        else:
-            # Softmax stuff should come back out normalized.
-            assert_array_almost_equal(np.sum(Xdec, axis=1), 1.0)
-
-            # Compute and test the scores.
-            scores = _cross_entropy(X, Xdec)
-            ae_scores = ae.score_samples(X)
-            assert_array_almost_equal(scores, ae_scores, decimal=5)
-
-        score = np.mean(scores)
-        ae_score = ae.score(X)
-        assert_almost_equal(score, ae_score, decimal=5)
-
-        _LOGGER.warning("\ntest info:\n    ae: %s\n"
-                        "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
-                        str(ae), ae_score,
-                        pprint.pformat(list(X[10]), compact=True),
-                        pprint.pformat(list(Xdec[10]), compact=True))
-
-        assert ae_score < 2.5, ("Autoencoder should have a score "
-                                "less than 2.5 for the iris features.")
-
-
-def test_sigmoid_single_hidden_unit():
-    """Test sigmoid indices w/ a single hidden unit."""
+def test_sigmoid():
+    """Test sigmoid indices."""
     _check_ae(1.2,
-              hidden_units=(1,),
+              hidden_units=(2,),
               bin_inds=range(4),
               loss='cross-entropy')
 
@@ -494,9 +557,9 @@ def test_cross_entropy_or_sigmoid():
         assert_almost_equal(score, scores[0], decimal=5)
 
 
-def test_softmax_single_hidden_unit():
-    """Test softmax indices a single hidden unit."""
-    _check_ae(3.0, hidden_units=(1,), cat_inds=range(4))
+def test_softmax():
+    """Test softmax indices."""
+    _check_ae(3.0, hidden_units=(2,), cat_inds=range(4))
 
 
 def test_sparse_inputs():
@@ -505,48 +568,49 @@ def test_sparse_inputs():
     for sparse_type in [None, 'csr', 'bsr', 'coo', 'csc', 'dok', 'lil']:
         scores.append(_check_ae(
             5.0,
+            hidden_units=(2,),
             sparse_type=sparse_type,
             cat_inds=range(4),
-            n_epochs=1000))
+            n_epochs=1000,
+            learning_rate=5e-3))
 
     # All scores should be equal.
     for score in scores:
         assert_almost_equal(score, scores[0])
 
 
-def test_sigmoid_mse_single_hidden_unit():
-    """Test sigmoid indices + MSE loss w/ a single hidden unit."""
-    _check_ae(0.2, hidden_units=(1,), bin_inds=[2, 3])
+def test_sigmoid_mse():
+    """Test sigmoid indices + MSE loss."""
+    _check_ae(0.2, hidden_units=(2,), bin_inds=[2, 3])
 
 
-def test_softmax_mse_single_hidden_unit():
-    """Test softmax indices + MSE loss w/ a single hidden unit."""
-    _check_ae(1.1, hidden_units=(1,), cat_inds=[2, 3])
+def test_softmax_mse():
+    """Test softmax indices + MSE loss."""
+    _check_ae(1.1, hidden_units=(2,), cat_inds=[2, 3])
 
 
-def test_softmax_sigmoid_single_hidden_unit():
-    """Test softmax + sigmoid indices w/ a single hidden unit."""
+def test_softmax_sigmoid():
+    """Test softmax + sigmoid indices."""
     CAT_CE_MAX_SCORE = 1.7
     score_noinds = _check_ae(
         CAT_CE_MAX_SCORE,
-        hidden_units=(1,),
+        hidden_units=(2,),
         cat_inds=[2, 3],
         bin_inds=[0, 1],
         bin_inds_to_use=-1,
         loss='cross-entropy')
     score_inds = _check_ae(
         CAT_CE_MAX_SCORE,
-        hidden_units=(1,),
+        hidden_units=(2,),
         cat_inds=[2, 3],
         bin_inds=[0, 1],
         loss='mse')
     assert_almost_equal(score_noinds, score_inds)
 
 
-def test_softmax_sigmoid_mse_single_hidden_unit():
-    """Test softmax + sigmoid indices + MSE loss w/ a single
-    hidden unit."""
+def test_softmax_sigmoid_mse():
+    """Test softmax + sigmoid indices + MSE loss."""
     _check_ae(1.0,
-              hidden_units=(1,),
+              hidden_units=(2,),
               cat_inds=[2, 3],
               bin_inds=[0])

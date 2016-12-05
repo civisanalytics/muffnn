@@ -43,7 +43,10 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         dropout will not be used. cf. `TensorFlow documentation
         <https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dropout>`
     hidden_activation : tensorflow graph operation, optional
-        The activation function for the hidden layers and encoding layer.
+        The activation function for the hidden layers.
+        See `tensorflow.nn` for various options.
+    encoding_activation : tensorflow graph operation, optional
+        The activation function for the encoding layer.
         See `tensorflow.nn` for various options.
     output_activation : tensorflow graph operation, optional
         The activation function for the output layer.
@@ -111,8 +114,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
     """
 
     def __init__(self, hidden_units=(16,), batch_size=128, n_epochs=5,
-                 keep_prob=1.0, hidden_activation=tf.nn.sigmoid,
-                 output_activation=tf.nn.sigmoid, random_state=None,
+                 keep_prob=1.0, hidden_activation=tf.nn.relu,
+                 encoding_activation=None,
+                 output_activation=None, random_state=None,
                  learning_rate=1e-3, loss='mse', sigmoid_indices=None,
                  softmax_indices=None):
         self.hidden_units = hidden_units
@@ -120,6 +124,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         self.n_epochs = n_epochs
         self.keep_prob = keep_prob
         self.hidden_activation = hidden_activation
+        self.encoding_activation = encoding_activation
         self.output_activation = output_activation
         self.random_state = random_state
         self.learning_rate = learning_rate
@@ -164,8 +169,12 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             if self.keep_prob != 1.0:
                 t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, layer_sz, scope='layer_%d' % i)
-            if self.hidden_activation is not None:
+            if (self.hidden_activation is not None and
+                i < len(self.hidden_units) - 1):
                 t = self.hidden_activation(t)
+            if (self.encoding_activation is not None and
+                        i == len(self.hidden_units) - 1):
+                t = self.encoding_activation(t)
 
         # Encoded values.
         self._encoded_values = t
@@ -405,6 +414,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         # Add attributes of this estimator
         state.update(dict(hidden_activation=self.hidden_activation,
+                          encoding_activation=self.encoding_activation,
                           output_activation=self.output_activation,
                           batch_size=self.batch_size,
                           keep_prob=self.keep_prob,
