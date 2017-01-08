@@ -105,13 +105,13 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self.input_targets_ = \
-                tf.placeholder(tf.int64, [None, self.n_classes_], "labels")
+                tf.placeholder('float', [None, self.n_classes_], "labels")
             self.output_layer_ = tf.nn.sigmoid(t)
         elif self.n_classes_ > 2:
-            self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
+            self.input_targets_ = tf.placeholder('float', [None], "targets")
             self.output_layer_ = tf.nn.softmax(t)
         else:
-            self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
+            self.input_targets_ = tf.placeholder('float', [None], "targets")
             t = tf.reshape(t, [-1])  # Convert to 1d tensor.
             self.output_layer_ = tf.nn.sigmoid(t)
         return t
@@ -119,14 +119,17 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     def _init_model_objective_fn(self, t):
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-                t, tf.cast(self.input_targets_, np.float32))
+                t, self.input_targets_)
         elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 t, self.input_targets_)
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
-        self._obj_func = tf.reduce_mean(cross_entropy)
+        y_finite=tf.where(tf.is_finite(self.input_targets_))
+
+        self._obj_func =  tf.reduce_sum((tf.gather(cross_entropy, y_finite)))
+
 
     def partial_fit(self, X, y, monitor=None, classes=None):
         """Fit the model on a batch of training data.
@@ -167,7 +170,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         Return whether the given target array corresponds to a multilabel
         problem.
         """
-        target_type = type_of_target(y)
+        temp_y=y.copy()
+        temp_y[np.isnan(temp_y)]=1
+        target_type = type_of_target(temp_y)
 
         if target_type in ['binary', 'multiclass']:
             return False

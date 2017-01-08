@@ -7,6 +7,52 @@ from abc import ABCMeta, abstractmethod
 from tempfile import NamedTemporaryFile
 import tensorflow as tf
 
+def affine_lasso(input_tensor, output_size, bias=True, bias_start=0.0,
+           input_size=None, scope="affine", sparse_input=False):
+    """Add an affine transformation of `input_tensor` to the current graph.
+
+    Note: This op is loosely based on tensorflow.python.ops.rnn_cell.linear.
+
+    An affine transformation is a linear transformation with a shift,
+    `t = tf.matmul(input_tensor, W) + b`.
+
+    Parameters
+    ----------
+    input_tensor : tensorflow Tensor object, rank 2
+        Input tensor to be transformed.
+    output_size : int
+        The output will be size [a, output_size] where `input_tensor` has
+        shape [a, b].
+    bias : bool, optional
+        If True, apply a bias to the transformation. If False, only a linear
+        transformation is applied (i.e., `t = tf.matmul(W, input_tensor)`).
+    bias_start : float, optional
+        The initial value for the bias `b`.
+    input_size : int, optional
+        Second dimension of the rank 2 input tensor. Required for sparse input
+        tensors.
+    sparse_input : bool, optional
+        Set to True if `input_tensor` is sparse.
+
+    Returns
+    -------
+    t : tensorflow tensor object
+        The affine transformation of `input_tensor`.
+    """
+
+    # The input size is needed for sparse matrices.
+    if input_size is None:
+        input_size = input_tensor.get_shape().as_list()[1]
+
+    with tf.variable_scope(scope):
+        W_0 = tf.get_variable(
+            "weights0",
+            [input_size, None])
+        # If the input is sparse, then use a special matmul routine.
+        matmul = tf.sparse_tensor_dense_matmul if sparse_input else tf.matmul
+        t = matmul(input_tensor, W_0)
+    return t
+
 
 def affine(input_tensor, output_size, bias=True, bias_start=0.0,
            input_size=None, scope="affine", sparse_input=False):

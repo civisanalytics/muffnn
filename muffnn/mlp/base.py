@@ -170,8 +170,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     def _check_inputs(self, X, y):
         # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
-        X, y = check_X_y(X, y, accept_sparse='csr', multi_output=True)
-
+        X = check_array(X, accept_sparse='csr',
+        force_all_finite=False)
+        y = check_array(y, 'csr', force_all_finite=False, ensure_2d=False,
+                        dtype=None)
         if y.ndim == 2 and y.shape[1] == 1:
             # Following
             # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/ensemble/forest.py#L223,
@@ -218,22 +220,22 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
 
         # A placeholder to control dropout for training vs. prediction.
         self._keep_prob = \
-            tf.placeholder(dtype=np.float32, shape=(), name="keep_prob")
+            tf.placeholder(dtype='float', shape=(), name="keep_prob")
 
         # Input layers.
         if self.is_sparse_:
             self._input_indices = \
-                tf.placeholder(np.int64, [None, 2], "input_indices")
+                tf.placeholder('float', [None, 2], "input_indices")
             self._input_values = \
-                tf.placeholder(np.float32, [None], "input_values")
+                tf.placeholder('float', [None], "input_values")
             self._input_shape = \
-                tf.placeholder(np.int64, [2], "input_shape")
+                tf.placeholder('float', [2], "input_shape")
             # t will be the current layer as we build up the graph below.
             t = tf.SparseTensor(self._input_indices, self._input_values,
                                 self._input_shape)
         else:
             self._input_values = \
-                tf.placeholder(np.float32, [None, self.input_layer_sz_],
+                tf.placeholder('float', [None, self.input_layer_sz_],
                                "input_values")
             t = self._input_values
 
