@@ -105,13 +105,15 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self.input_targets_ = \
-                tf.placeholder('float', [None, self.n_classes_], "labels")
+                tf.placeholder(tf.float32, [None, self.n_classes_], "targets")
             self.output_layer_ = tf.nn.sigmoid(t)
+            self.zeros=tf.zeros_like(self.output_layer_)
+
         elif self.n_classes_ > 2:
-            self.input_targets_ = tf.placeholder('float', [None], "targets")
+            self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")
             self.output_layer_ = tf.nn.softmax(t)
         else:
-            self.input_targets_ = tf.placeholder('float', [None], "targets")
+            self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")
             t = tf.reshape(t, [-1])  # Convert to 1d tensor.
             self.output_layer_ = tf.nn.sigmoid(t)
         return t
@@ -119,16 +121,18 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     def _init_model_objective_fn(self, t):
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-                t, self.input_targets_)
+                t, tf.cast(self.input_targets_, tf.float32))
         elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 t, self.input_targets_)
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
-        y_finite=tf.where(tf.is_finite(self.input_targets_))
-
-        self._obj_func =  tf.reduce_sum((tf.gather(cross_entropy, y_finite)))
+        y_finite=tf.equal(self.input_targets_, -1)
+        self._selections=tf.select(y_finite,  cross_entropy , self.zeros)
+        self._yfinite=y_finite
+        self.ce=cross_entropy
+        self._obj_func =  tf.reduce_sum(tf.select(y_finite,  cross_entropy , self.zeros))
 
 
     def partial_fit(self, X, y, monitor=None, classes=None):
