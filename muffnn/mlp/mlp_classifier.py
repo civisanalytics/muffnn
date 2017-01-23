@@ -129,10 +129,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
         y_finite=tf.equal(self.input_targets_, -1)
-        self._selections=tf.select(y_finite,  cross_entropy , self.zeros)
+        self._selections=tf.select(y_finite, self.zeros, cross_entropy )
         self._yfinite=y_finite
         self.ce=cross_entropy
-        self._obj_func =  tf.reduce_sum(tf.select(y_finite,  cross_entropy , self.zeros))
+        self._obj_func =  tf.reduce_sum(tf.select(y_finite,  self.zeros,cross_entropy ))
 
 
     def partial_fit(self, X, y, monitor=None, classes=None):
@@ -175,7 +175,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         problem.
         """
         temp_y=y.copy()
-        temp_y[np.isnan(temp_y)]=1
+        if np.isnan(temp_y).sum()>0:
+            raise ValueError("Cannot have NA's in response variable. Please change to -1")
+        temp_y[(temp_y == -1)]=1
         target_type = type_of_target(temp_y)
 
         if target_type in ['binary', 'multiclass']:
