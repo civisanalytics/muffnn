@@ -122,15 +122,17 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
+            y_finite = tf.equal(self.input_targets_, -1)
+            self._obj_func = tf.reduce_mean(
+                tf.select(y_finite, self._zeros, cross_entropy))
         elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 t, self.input_targets_)
+            self._obj_func = tf.reduce_mean(cross_entropy)
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
-        y_finite = tf.equal(self.input_targets_, -1)
-        self._obj_func = tf.reduce_mean(
-            tf.select(y_finite, self._zeros, cross_entropy))
+            self._obj_func = tf.reduce_mean(cross_entropy)
 
     def partial_fit(self, X, y, monitor=None, classes=None):
         """Fit the model on a batch of training data.
