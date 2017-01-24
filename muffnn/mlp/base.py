@@ -133,9 +133,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 self._build_tf_graph()
 
                 # Train model parameters.
-                self._session.run(tf.initialize_all_variables())\
-                    # Set an attributed to mark this as at least partially
-                # fitted.
+                self._session.run(tf.initialize_all_variables())
+
+            # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
 
         # Train the model with the given data.
@@ -170,10 +170,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     def _check_inputs(self, X, y):
         # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
-        X = check_array(X, accept_sparse='csr',
-                        force_all_finite=False)
-        y = check_array(y, 'csr', force_all_finite=False, ensure_2d=False,
-                        dtype=None)
+        X, y = check_X_y(X, y, accept_sparse='csr', multi_output=True)
         if y.ndim == 2 and y.shape[1] == 1:
             # Following
             # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/ensemble/forest.py#L223,
