@@ -112,7 +112,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         if self._is_fitted:
             y = self._transform_targets(y)
         else:
-            self._checks = []
             self._random_state = check_random_state(self.random_state)
             self._fit_targets(y, **kwargs)
             y = self._transform_targets(y)
@@ -134,11 +133,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 self._build_tf_graph()
 
                 # Train model parameters.
-                self._session.run(tf.initialize_all_variables())
-                self._checks.append(tf.check_numerics(self._obj_func, 'objfunc is bad!'))
-
-
-            # Set an attributed to mark this as at least partially fitted.
+                self._session.run(tf.initialize_all_variables())\
+                    # Set an attributed to mark this as at least partially
+                # fitted.
             self._is_fitted = True
 
         # Train the model with the given data.
@@ -149,29 +146,15 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
             for epoch in range(self.n_epochs):
                 self._random_state.shuffle(indices)
                 for start_idx in range(0, n_examples, self.batch_size):
-                    self.zeros=tf.constant(0, dtype=tf.float32,shape=[self.batch_size,self.n_classes_])
                     batch_ind = indices[start_idx:start_idx + self.batch_size]
-                    yb = y[batch_ind]
-                    msk = np.isfinite(yb)
-                    yb[~msk] = -1
                     feed_dict = self._make_feed_dict(X[batch_ind],
-                                                     yb)
-
-                    vals = self._session.run(
-                        [self._obj_func, self._train_step_step, self._selections, self._yfinite, self.ce] + self._checks,
+                                                     y[batch_ind])
+                    obj_val, _ = self._session.run(
+                        [self._obj_func, self._train_step],
                         feed_dict=feed_dict)
-                    obj_val = vals[0]
-                    selections = vals[2]
-                    yfin = vals[3]
-                    ce = vals[4]
                     _LOGGER.debug("objective: %.4f, epoch: %d, idx: %d",
                                   obj_val, epoch, start_idx)
-                    print(ce)
-                    print(selections)
-                    print(selections.shape)
-                    print(selections.sum())
-                    print(obj_val)
-                    print(yfin)
+
                 _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
                              obj_val, epoch, start_idx)
 
@@ -188,7 +171,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
         X = check_array(X, accept_sparse='csr',
-        force_all_finite=False)
+                        force_all_finite=False)
         y = check_array(y, 'csr', force_all_finite=False, ensure_2d=False,
                         dtype=None)
         if y.ndim == 2 and y.shape[1] == 1:
@@ -265,7 +248,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 if self.keep_prob != 1.0:
                     t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
-                self._checks.append(tf.check_numerics(t, 'layer_%d' % i))
             t = t if self.activation is None else self.activation(t)
 
         # The output layer and objective function depend on the model
@@ -273,12 +255,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         t = self._init_model_output(t)
         self._init_model_objective_fn(t)
 
-        self._train_step = tf.train.AdamOptimizer()
-        self._grads_and_vars = self._train_step.compute_gradients(self._obj_func, tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
-        # for a, b in self._grads_and_vars:
-        #     self._checks.append(tf.check_numerics(a, a.name))
-        #     self._checks.append(tf.check_numerics(b, b.name))
-        self._train_step_step = self._train_step.apply_gradients(self._grads_and_vars)
+        self._train_step = tf.train.AdamOptimizer().minimize(self._obj_func)
 
     def _make_feed_dict(self, X, y=None):
         # Make the dictionary mapping tensor placeholders to input data.
