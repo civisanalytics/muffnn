@@ -108,7 +108,6 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 tf.placeholder(tf.int64, [None, self.n_classes_], "targets")
             self.output_layer_ = tf.nn.sigmoid(t)
             self._zeros = tf.zeros_like(self.output_layer_)
-
         elif self.n_classes_ > 2:
             self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
             self.output_layer_ = tf.nn.softmax(t)
