@@ -173,10 +173,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         problem.
         """
         temp_y = y.copy()
-        if np.isnan(temp_y).sum() > 0:
-            raise ValueError(
-                "Cannot have NA's in response variable. Please change to -1")
-        temp_y[(temp_y == -1)] = 1
+        temp_y[np.where(temp_y == -1)] = 1
         target_type = type_of_target(temp_y)
 
         if target_type in ['binary', 'multiclass']:
