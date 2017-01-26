@@ -173,7 +173,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         problem.
         """
         temp_y = y.copy()
-        temp_y[np.where(temp_y == -1)] = 1
+        temp_y[np.zeros_like(temp_y, dtype=bool) | (temp_y == -1)] = 1
         target_type = type_of_target(temp_y)
 
         if target_type in ['binary', 'multiclass']:
