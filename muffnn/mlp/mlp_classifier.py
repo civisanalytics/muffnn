@@ -105,8 +105,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self.input_targets_ = \
-                tf.placeholder(tf.int64, [None, self.n_classes_], "labels")
+                tf.placeholder(tf.int64, [None, self.n_classes_], "targets")
             self.output_layer_ = tf.nn.sigmoid(t)
+            self._zeros = tf.zeros_like(self.output_layer_)
         elif self.n_classes_ > 2:
             self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
             self.output_layer_ = tf.nn.softmax(t)
@@ -120,13 +121,17 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
+            y_finite = tf.equal(self.input_targets_, -1)
+            self._obj_func = tf.reduce_mean(
+                tf.select(y_finite, self._zeros, cross_entropy))
         elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 t, self.input_targets_)
+            self._obj_func = tf.reduce_mean(cross_entropy)
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 t, tf.cast(self.input_targets_, np.float32))
-        self._obj_func = tf.reduce_mean(cross_entropy)
+            self._obj_func = tf.reduce_mean(cross_entropy)
 
     def partial_fit(self, X, y, monitor=None, classes=None):
         """Fit the model on a batch of training data.
@@ -167,7 +172,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         Return whether the given target array corresponds to a multilabel
         problem.
         """
-        target_type = type_of_target(y)
+        temp_y = y.copy()
+        temp_y[np.zeros_like(temp_y, dtype=bool) | (temp_y == -1)] = 1
+        target_type = type_of_target(temp_y)
 
         if target_type in ['binary', 'multiclass']:
             return False

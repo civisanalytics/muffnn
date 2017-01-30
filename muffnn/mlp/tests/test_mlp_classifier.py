@@ -32,6 +32,12 @@ Y2 = [2, 1, 0]
 Y_multilabel = np.array([[0, 1, 0],
                          [1, 1, 0],
                          [1, 0, 1]])
+Y_multilabel_na = np.array([[0, 1, 0],
+                            [-1, 1, -1],
+                            [1, 0, 1]])
+Y_multilabel_NaNs = np.array([[0, 1, 0],
+                              [np.nan, 1, np.nan],
+                              [1, 0, 1]])
 
 # The defaults kwargs don't work for tiny datasets like those in these tests.
 KWARGS = {"random_state": 0, "n_epochs": 100, "batch_size": 1}
@@ -40,6 +46,7 @@ KWARGS = {"random_state": 0, "n_epochs": 100, "batch_size": 1}
 # Make a subclass that has its default number of epochs high enough not to fail
 # the toy example tests that have only a handful of examples.
 class MLPClassifierManyEpochs(MLPClassifier):
+
     def __init__(self, hidden_units=(256,), batch_size=64,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1):
         super().__init__(hidden_units=hidden_units, batch_size=batch_size,
@@ -66,9 +73,44 @@ def check_multilabel_predictions(clf, X, y):
         "multilabel classifier is outputting distributions"
 
 
+def check_multilabel_predictions_na(clf, X, y):
+    predicted = clf.fit(X, y).predict(X)
+    # change nans to zero to 'mask' those values
+    is_na = (y == -1)
+    predicted[is_na] = 0
+    y_temp = y.copy()
+    y_temp[is_na] = 0
+
+    assert_equal(predicted.shape, y_temp.shape)
+    assert_array_equal(predicted, y_temp)
+
+    probabilities = clf.predict_proba(X)
+    probabilities[is_na] = 0
+    assert_equal(probabilities.shape, y_temp.shape)
+    assert_array_equal((probabilities >= 0.5).astype(np.int), predicted)
+    assert np.sum(np.abs(probabilities.sum(axis=1) - 1)) > 0.01,\
+        "multilabel classifier is not outputting distributions"
+
+
+def check_error_with_nans(clf, X, y):
+    with pytest.raises(ValueError) as excinfo:
+        clf.fit(X, y).predict(X)
+    assert "Input contains NaN, infinity or a value too large for \
+        dtype('float64')." in str(excinfo.value)
+
+
 def test_multilabel():
     check_multilabel_predictions(MLPClassifier(**KWARGS), X, Y_multilabel)
     check_multilabel_predictions(MLPClassifier(**KWARGS), X_sp, Y_multilabel)
+
+
+def test_multilabel_na():
+    check_multilabel_predictions_na(
+        MLPClassifier(**KWARGS), X, Y_multilabel_na)
+    check_multilabel_predictions_na(
+        MLPClassifier(**KWARGS), X_sp, Y_multilabel_na)
+    check_error_with_nans(MLPClassifier(**KWARGS), X, Y_multilabel_NaNs)
+    check_error_with_nans(MLPClassifier(**KWARGS), X_sp, Y_multilabel_NaNs)
 
 
 def test_predict_2_classes():

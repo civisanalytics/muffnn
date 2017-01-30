@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+atom#!/usr/bin/env python3
 
 """
 A Deep Neural Network (multilayer Perceptron) sklearn-style estimator abstract
