@@ -98,6 +98,7 @@ def check_error_with_nans(clf, X, y):
     assert "Input contains NaN, infinity or a value too large for " \
         "dtype('float64').".format() in str(excinfo.value)
 
+
 def test_multilabel():
     check_multilabel_predictions(MLPClassifier(**KWARGS), X, Y_multilabel)
     check_multilabel_predictions(MLPClassifier(**KWARGS), X_sp, Y_multilabel)
