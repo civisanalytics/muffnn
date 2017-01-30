@@ -171,7 +171,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         # Check that the input X is an array or sparse matrix.
         # Convert to CSR if it's in another sparse format.
         X, y = check_X_y(X, y, accept_sparse='csr', multi_output=True)
-
+        
         if y.ndim == 2 and y.shape[1] == 1:
             # Following
             # https://github.com/scikit-learn/scikit-learn/blob/51a765a/sklearn/ensemble/forest.py#L223,
