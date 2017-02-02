@@ -256,7 +256,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         # Add the fitted attributes particular to this subclass.
         if self._is_fitted:
-            state['_enc'] = self.classes_
+            state['_enc'] = self._enc
             state['classes_'] = self.classes_
             state['multilabel_'] = self.multilabel_
             state['n_classes_'] = self.n_classes_
