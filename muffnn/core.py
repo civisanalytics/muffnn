@@ -192,7 +192,8 @@ class TFPicklingBase(metaclass=ABCMeta):
         if self._is_fitted:
             with TemporaryDirectory() as tmpdir:
                 # Serialize the model.
-                self._saver.save(self._session, os.path.join(tmpdir, 'saved_model'))
+                self._saver.save(
+                    self._session, os.path.join(tmpdir, 'saved_model'))
 
                 # TF writes a bunch of files so tar them.
                 fnames = glob.glob(os.path.join(tmpdir, '*'))
@@ -237,7 +238,8 @@ class TFPicklingBase(metaclass=ABCMeta):
                 self.graph_ = tf.Graph()
                 with self.graph_.as_default():
                     self._build_tf_graph()
-                    self._saver.restore(self._session, os.path.join(tmpdir, 'saved_model'))
+                    self._saver.restore(
+                        self._session, os.path.join(tmpdir, 'saved_model'))
 
     def _build_tf_graph(self):
         """Build the TF graph, setup model saving and setup a TF session.
