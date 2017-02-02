@@ -3,8 +3,10 @@
 Core base classes and utilities for muffnn.
 """
 import os
+import glob
+import tarfile
 from abc import ABCMeta, abstractmethod
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory
 import tensorflow as tf
 
 
@@ -188,15 +190,20 @@ class TFPicklingBase(metaclass=ABCMeta):
         # Override __getstate__ so that TF model parameters are pickled
         # properly.
         if self._is_fitted:
-            tempfile = NamedTemporaryFile(delete=False)
-            tempfile.close()
-            try:
-                # Serialize the model and read it so it can be pickled.
-                self._saver.save(self._session, tempfile.name)
-                with open(tempfile.name, 'rb') as f:
+            with TemporaryDirectory() as tmpdir:
+                # Serialize the model.
+                self._saver.save(self._session, os.path.join(tmpdir, 'saved_model'))
+
+                # TF writes a bunch of files so tar them.
+                fnames = glob.glob(os.path.join(tmpdir, '*'))
+                tarname = os.path.join(tmpdir, 'saved_model.tar')
+                with tarfile.open(tarname, "w") as tar:
+                    for f in fnames:
+                        tar.add(f, arcname=os.path.split(f)[-1])
+
+                # Now read the state back into memory.
+                with open(tarname, 'rb') as f:
                     saved_model = f.read()
-            finally:
-                os.unlink(tempfile.name)
 
         # Note: don't include the graph since it should be recreated.
         state = {}
@@ -216,18 +223,21 @@ class TFPicklingBase(metaclass=ABCMeta):
                 self.__dict__[k] = v
 
         if state.get('_fitted', False):
-            tempfile = NamedTemporaryFile(delete=False)
-            tempfile.close()
-            try:
-                # Write out the serialized model that can be restored by TF.
-                with open(tempfile.name, 'wb') as f:
+            with TemporaryDirectory() as tmpdir:
+                # Write out the serialized tarfile.
+                tarname = os.path.join(tmpdir, 'saved_model.tar')
+                with open(tarname, 'wb') as f:
                     f.write(state['_saved_model'])
+
+                # Untar it.
+                with tarfile.open(tarname, 'r') as tar:
+                    tar.extractall(path=tmpdir)
+
+                # And restore.
                 self.graph_ = tf.Graph()
                 with self.graph_.as_default():
                     self._build_tf_graph()
-                    self._saver.restore(self._session, tempfile.name)
-            finally:
-                os.unlink(tempfile.name)
+                    self._saver.restore(self._session, os.path.join(tmpdir, 'saved_model'))
 
     def _build_tf_graph(self):
         """Build the TF graph, setup model saving and setup a TF session.

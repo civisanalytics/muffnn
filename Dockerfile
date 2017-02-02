@@ -32,6 +32,6 @@ RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
 COPY . /src/muffnn
 RUN conda env create -f /src/muffnn/environment.yml -q
 RUN conda install flake8 pytest pip nose -n muffnn && \
-    pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.11.0-cp35-cp35m-linux_x86_64.whl
+    pip install tensorflow
 RUN cd /src/muffnn && \
     pip install .
