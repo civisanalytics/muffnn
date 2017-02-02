@@ -22,7 +22,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y && \
         curl \
         libpq-dev
 
-
+# Conda install
 RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
     wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh && \
     /bin/bash /Miniconda3-4.2.12-Linux-x86_64.sh -b -p /opt/conda && \
@@ -31,7 +31,6 @@ RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
 
 COPY . /src/muffnn
 RUN conda env create -f /src/muffnn/environment.yml -q
-RUN conda install flake8 pytest pip nose -n muffnn && \
-    pip install tensorflow
+RUN conda install flake8 pytest pip nose -n muffnn
 RUN cd /src/muffnn && \
     pip install .
