@@ -20,7 +20,7 @@ class TFAdder(TFPicklingBase):
         self.graph_ = tf.Graph()
         with self.graph_.as_default():
             self._build_tf_graph()
-            self._session.run(tf.initialize_all_variables())
+            self._session.run(tf.global_variables_initializer())
             self._is_fitted = True
 
     def _set_up_graph(self):
