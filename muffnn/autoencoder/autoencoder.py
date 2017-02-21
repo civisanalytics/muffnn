@@ -153,7 +153,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         # scores. TensorFlow does not support scatter operations into Tesnors
         # (i.e., the results of TF graph operations). Thus we use masks to
         # place the right data in the right spot.
-        # The masks are type `tf.bool` to be used with `tf.select`.
+        # The masks are type `tf.bool` to be used with `tf.where`.
         self._default_msk = tf.placeholder(tf.bool,
                                            [None, self.input_layer_size_],
                                            "default_msk")
@@ -242,18 +242,16 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             if self.output_activation is not None:
                 t = self.output_activation(t)
             diff = t - self._input_values
-            scores = tf.reduce_sum(tf.square(diff),
-                                   reduction_indices=[1])
+            scores = tf.reduce_sum(tf.square(diff), axis=1)
         elif self.loss == 'cross-entropy':
             if self.output_activation is tf.nn.sigmoid:
                 scores = tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                        t, self._input_values),
-                    reduction_indices=[1])
+                        logits=t, labels=self._input_values), axis=1)
                 t = tf.nn.sigmoid(t)
             elif self.output_activation is tf.nn.softmax:
                 scores = tf.nn.softmax_cross_entropy_with_logits(
-                    t, self._input_values, dim=1)
+                    logits=t, labels=self._input_values, dim=1)
                 t = tf.nn.softmax(t)
             else:
                 raise ValueError("Only `tensorflow.nn.sigmoid` and "
@@ -294,9 +292,9 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                     self._softmax_indices[:, 1]):
                 tsub = tf.slice(t, [begin, 0], [size, -1])
                 scores += tf.nn.softmax_cross_entropy_with_logits(
-                    tsub,
-                    tf.slice(tf.transpose(self._input_values),
-                             [begin, 0], [size, -1]),
+                    logits=tsub,
+                    labels=tf.slice(tf.transpose(self._input_values),
+                                    [begin, 0], [size, -1]),
                     dim=0)
 
                 # This one is painful. TensorFlow does not, AFAIK,
@@ -308,8 +306,8 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 # the proper subset of the elements.
                 msk = tf.transpose(self._softmax_msks[i, :, :])
                 log_softmax_denom = tf.reduce_logsumexp(
-                    tsub, keep_dims=True, reduction_indices=[0])
-                t = tf.select(msk, tf.exp(t - log_softmax_denom), t)
+                    tsub, keep_dims=True, axis=0)
+                t = tf.where(msk, tf.exp(t - log_softmax_denom), t)
 
         # Sigmoid output w/ cross-entropy.
         if self._sigmoid_indices is not None:
@@ -317,10 +315,11 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             isub = tf.gather(tf.transpose(self._input_values),
                              self._sigmoid_indices)
             scores += tf.reduce_sum(
-                tf.nn.sigmoid_cross_entropy_with_logits(tsub, isub),
-                reduction_indices=[0])
+                tf.nn.sigmoid_cross_entropy_with_logits(logits=tsub,
+                                                        labels=isub),
+                axis=0)
             sigmoid_msk = tf.transpose(self._sigmoid_msk)
-            t = tf.select(sigmoid_msk, tf.nn.sigmoid(t), t)
+            t = tf.where(sigmoid_msk, tf.nn.sigmoid(t), t)
 
         # Anything left uses the default loss.
         if self._default_indices is not None:
@@ -328,13 +327,12 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
             if self.loss == 'mse':
                 if self.output_activation is not None:
-                    t = tf.select(default_msk, self.output_activation(t), t)
+                    t = tf.where(default_msk, self.output_activation(t), t)
                 tsub = tf.gather(t, self._default_indices)
                 isub = tf.gather(tf.transpose(self._input_values),
                                  self._default_indices)
                 diff = isub - tsub
-                scores += tf.reduce_sum(tf.square(diff),
-                                        reduction_indices=[0])
+                scores += tf.reduce_sum(tf.square(diff), axis=0)
             elif self.loss == 'cross-entropy':
                 tsub = tf.gather(t, self._default_indices)
                 isub = tf.gather(tf.transpose(self._input_values),
@@ -342,20 +340,20 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
                 if self.output_activation is tf.nn.sigmoid:
                     scores += tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(tsub,
-                                                                isub),
-                        reduction_indices=[0])
-                    t = tf.select(default_msk, tf.nn.sigmoid(t), t)
+                        tf.nn.sigmoid_cross_entropy_with_logits(logits=tsub,
+                                                                labels=isub),
+                        axis=0)
+                    t = tf.where(default_msk, tf.nn.sigmoid(t), t)
                 elif self.output_activation is tf.nn.softmax:
                     # More pain here. The softmax has an implicit sum,
                     # and since we cannot scatter into Tensors, we
                     # break up the comp into the denominator and the
                     # numerator using the mask.
                     scores += tf.nn.softmax_cross_entropy_with_logits(
-                        tsub, isub, dim=0)
+                        logits=tsub, labels=isub, dim=0)
                     log_softmax_denom = tf.reduce_logsumexp(
-                        tsub, reduction_indices=[0], keep_dims=True)
-                    t = tf.select(
+                        tsub, axis=0, keep_dims=True)
+                    t = tf.where(
                         default_msk, tf.exp(t - log_softmax_denom), t)
                 else:
                     raise ValueError("Only `tensorflow.nn.sigmoid` and "
@@ -556,7 +554,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 self._build_tf_graph()
 
                 # Train model parameters.
-                self._session.run(tf.initialize_all_variables())
+                self._session.run(tf.global_variables_initializer())
 
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
