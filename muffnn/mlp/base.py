@@ -133,7 +133,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
                 self._build_tf_graph()
 
                 # Train model parameters.
-                self._session.run(tf.initialize_all_variables())
+                self._session.run(tf.global_variables_initializer())
 
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True

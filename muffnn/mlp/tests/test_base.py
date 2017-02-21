@@ -40,7 +40,7 @@ class TestEstimator(base.MLPBaseEstimator):
 
     def _init_model_objective_fn(self, t):
         cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            t, self.input_targets_)
+            logits=t, labels=self.input_targets_)
         self._obj_func = tf.reduce_mean(cross_entropy)
 
 
