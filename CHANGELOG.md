@@ -1,8 +1,14 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](http://keepachangelog.com/) 
+The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
+
+## [1.0.0] - 2017-02-23
+
+### Changed
+
+- Upgraded to TensorFlow 1.0.0.
 
 ## [0.2.0] - 2016-11-29
 
@@ -13,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   stopping, checkpointing, etc.
 - Add top-level base class for pickling TensorFlow models.
 - Add partial fitting functionality for the MLP.
+- Add support for missing labels during multilabel classification.
 
 ### Changed
 
@@ -20,10 +27,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Stop adding dropout nodes to MLP graphs if `keep_prob` is 1.
 - Change `dropout` keyword argument to `keep_prob` for consistency with
   TensorFlow.
-- Updated dependencies (notably, scikit-learn and TensorFlow)
+- Updated dependencies (notably, scikit-learn and TensorFlow).
 
 ### Fixed
 
+- `LabelEncoder` in the MLPClassifier is pickled properly.
 - Fix multilabel classification, which was broken previously.
 
 ## [0.1.0] - 2016-08-25
