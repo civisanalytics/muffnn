@@ -6,4 +6,3 @@ dependencies:
   - scikit-learn=0.18.1
   - pip:
     - tensorflow==1.0.0
-    - muffnn==1.0.0

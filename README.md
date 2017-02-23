@@ -13,11 +13,12 @@ Installation with `pip` is recommended:
 pip install muffnn
 ```
 
-You can also create a `conda` environment with `muffnn` installed
+You can also create a `conda` environment:
 
 ```bash
 conda env create -f environment.yml
 source activate muffnn
+pip install muffnn
 ```
 
 Google provides TensorFlow pip wheels for different OSs and architectures.
