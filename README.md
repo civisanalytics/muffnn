@@ -69,3 +69,4 @@ See `LICENSE.txt` for details.
 * [Walt Askew](https://github.com/waltaskew/)
 * [Matt Becker](https://github.com/beckermr/)
 * [Bill Lattner](https://github.com/wlattner/)
+* [Sam Weiss](https://github.com/samcarlos)
