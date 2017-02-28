@@ -17,5 +17,6 @@ setup(
                  'TensorFlow and scikit-learn'),
     long_description=open(os.path.join(THIS_DIR, 'README.md')).read(),
     include_package_data=True,
-    license="BSD-3"
+    license="BSD-3",
+    install_requires=read('requirements.txt').split('\n')
 )
