@@ -1,12 +1,13 @@
 machine:
-  services:
-    - docker
+  python:
+    version: 3.5.2
 
 dependencies:
-  override:
-    - docker info
-    - docker build -t civisanalytics/muffnn .
+  post:
+    - pip install flake8 pytest
 
 test:
   override:
-    - docker run civisanalytics/muffnn bash -c "cd /src/muffnn && py.test muffnn && flake8 ."
+    - pytest muffnn:
+        timeout: 1200
+    - flake8 .
