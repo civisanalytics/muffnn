@@ -10,7 +10,7 @@ from tensorflow.python.ops import nn
 import muffnn.mlp.base as base
 
 
-class TestEstimator(base.MLPBaseEstimator):
+class SimpleTestEstimator(base.MLPBaseEstimator):
 
     _input_indices = 'input_indices'
     _input_values = 'input_values'
@@ -51,7 +51,7 @@ def test_make_feed_dict_csr():
         shape=(3, 3))
     y = np.array([1, 2, 3])
 
-    clf = TestEstimator()
+    clf = SimpleTestEstimator()
     clf.is_sparse_ = True
 
     feed_dict = clf._make_feed_dict(X, y)
@@ -66,7 +66,7 @@ def test_make_feed_dict_other():
         shape=(3, 3))
     y = np.array([1, 2, 3])
 
-    clf = TestEstimator()
+    clf = SimpleTestEstimator()
     clf.is_sparse_ = True
 
     feed_dict = clf._make_feed_dict(X, y)
@@ -86,7 +86,7 @@ def test_fit_monitor(mock_Session):
     X = np.reshape(np.arange(9), (3, 3))
     y = np.arange(3)
 
-    clf = TestEstimator(n_epochs=10, batch_size=2)
+    clf = SimpleTestEstimator(n_epochs=10, batch_size=2)
     clf.fit(X, y, monitor=mock_eval)
     # two batches per epoch + an initialize variables call
     assert mock_Session().run.call_count == 21
@@ -94,7 +94,7 @@ def test_fit_monitor(mock_Session):
 
     mock_Session.reset_mock()
     mock_eval.reset_mock()
-    clf = TestEstimator(n_epochs=10, batch_size=3)
+    clf = SimpleTestEstimator(n_epochs=10, batch_size=3)
     clf.fit(X, y, monitor=mock_eval)
     # one batch per epoch
     assert mock_Session().run.call_count == 11
@@ -103,7 +103,7 @@ def test_fit_monitor(mock_Session):
     mock_Session.reset_mock()
     mock_eval.reset_mock()
     mock_eval = unittest.mock.MagicMock(return_value=True)
-    clf = TestEstimator(n_epochs=10, batch_size=3)
+    clf = SimpleTestEstimator(n_epochs=10, batch_size=3)
     clf.fit(X, y, monitor=mock_eval)
     # Our monitor returns true, so it should only do one epoch
     assert mock_Session().run.call_count == 2
@@ -133,7 +133,7 @@ def test_partial_fit_random_state():
     y = np.arange(50)
     X = np.expand_dims(y, 1)
 
-    clf = TestEstimator(random_state=42, n_epochs=1)
+    clf = SimpleTestEstimator(random_state=42, n_epochs=1)
     clf.is_sparse_ = False
 
     # Note that the first `partial_fit` call will use the random state to set
