@@ -4,10 +4,9 @@ machine:
 
 dependencies:
   post:
-    - pip install flake8 pytest
+    - pip install flake8 pytest pytest-faulthandler
 
 test:
   override:
-    - pytest muffnn:
-        timeout: 1200
+    - pytest muffnn
     - flake8 .
