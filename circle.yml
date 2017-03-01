@@ -1,12 +1,16 @@
-machine:
-  python:
-    version: 3.5.2
-
 dependencies:
-  post:
-    - pip install flake8 pytest pytest-faulthandler
+  override:
+    - wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh
+    - bash Miniconda3-4.2.12-Linux-x86_64.sh -b -p ${HOME}/conda
+    - rm Miniconda3-4.2.12-Linux-x86_64.sh
+    - ${HOME}/conda/bin/conda install --yes conda==4.2.12
+    - echo "conda ==4.2.12" > ${HOME}/conda/conda-meta/pinned
+    - ${HOME}/conda/bin/conda install --yes python==3.5.2
+    - echo "\npython ==3.5.2" >> ${HOME}/conda/conda-meta/pinned
+    - PATH=${HOME}/conda/bin:$PATH conda env create -f environment.yml
+    - PATH=${HOME}/conda/bin:$PATH conda install -y flake8 pytest nose -n muffnn
 
 test:
   override:
-    - pytest muffnn
-    - flake8 .
+    - bash -c "export PATH=${HOME}/conda/bin:${PATH} && source activate muffnn && flake8 muffnn"
+    - bash -c "export PATH=${HOME}/conda/bin:${PATH} && source activate muffnn && pytest muffnn"
