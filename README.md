@@ -13,10 +13,12 @@ Installation with `pip` is recommended:
 pip install muffnn
 ```
 
-You can install the requirements with the `requirements.txt`:
+You can also create a `conda` environment:
 
 ```bash
-pip install -r requirements.txt
+conda env create -f environment.yml
+source activate muffnn
+pip install muffnn
 ```
 
 Google provides TensorFlow pip wheels for different OSs and architectures.
@@ -25,7 +27,7 @@ See [this page](https://www.tensorflow.org/install/) for more details.
 For development, a few additional dependencies are needed:
 
 ```bash
-pip install flake8 pytest
+conda install flake8 pytest nose
 ```
 
 # Usage
