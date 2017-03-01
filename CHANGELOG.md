@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
-- Deprecated docker build.
-- Moved python dependencies to pip.
+- Removed Docker build.
 - Added `install_requires` to `setup.py`.
 - Updated tests of MLP base class to silence `pytest` warning.
 
