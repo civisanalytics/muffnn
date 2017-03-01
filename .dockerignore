@@ -1,7 +1,0 @@
-build/
-*.pyc
-*.so
-*.egg-info
-.git
-.gitignore
-circle.yml
