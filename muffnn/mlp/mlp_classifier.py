@@ -265,5 +265,5 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         accuracy = np.array(y) == self.predict(X)
-        accuracy = accuracy[np.array(y) != -1].mean(axis=0).mean()
+        accuracy = accuracy[np.array(y) != -1].mean()
         return accuracy
