@@ -49,10 +49,16 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         `uniform_unit_scaling_initializer
         <https://www.tensorflow.org/versions/r0.8/api_docs/python/state_ops.html#uniform_unit_scaling_initializer>`,
         is used.
-    random_state: int, RandomState instance or None, optional
+    random_state : int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
         used.
+    solver : a subclass of `tf.train.Optimizer`, optional
+        The solver to use to minimize the loss.
+    **solver_kwargs : optional
+        Additional keyword arguments to pass to `solver` upon construction.
+        See the TensorFlow documentation for possible options. Typically,
+        one would want to set the `learning_rate`.
 
     Attributes
     ----------
@@ -67,8 +73,6 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
     Notes
     -----
-    tensorflow's Adam implementation is used for optimization.
-
     For multilabel classification, one can pass a 2D int array with 0 or more
     1s per row to `fit`.
 
@@ -77,7 +81,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1,
-                 random_state=None):
+                 random_state=None, solver=tf.train.AdamOptimizer,
+                 **solver_kwargs):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -85,6 +90,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         self.activation = activation
         self.init_scale = init_scale
         self.random_state = random_state
+        self.solver = solver
+        self.solver_kwargs = solver_kwargs
 
     def _init_model_output(self, t):
 
