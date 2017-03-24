@@ -54,8 +54,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         the random number generator itself. If None, then `np.random` will be
         used.
     solver : a subclass of `tf.train.Optimizer`, optional
-        The solver to use to minimize the loss. The default is
-        `tf.train.AdamOptimizer`.
+        The solver to use to minimize the loss.
     **solver_kwargs : optional
         Additional keyword arguments to pass to `solver` upon construction.
         See the TensorFlow documentation for possible options. Typically,
