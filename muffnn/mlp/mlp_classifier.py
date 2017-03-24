@@ -49,14 +49,14 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         `uniform_unit_scaling_initializer
         <https://www.tensorflow.org/versions/r0.8/api_docs/python/state_ops.html#uniform_unit_scaling_initializer>`,
         is used.
-    random_state: int, RandomState instance or None, optional
+    random_state : int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
         used.
-    solver: an instance of a subclass of `tf.train.Optimizer`, optional
+    solver : a subclass of `tf.train.Optimizer`, optional
         The solver to use to minimize the loss. The default is
         `tf.train.AdamOptimizer`.
-    **solver_kwargs: keyword arguments, optional
+    **solver_kwargs : optional
         Additional keyword arguments to pass to `solver` upon construction.
         See the TensorFlow documentation for possible options. Typically,
         one would want to set the `learning_rate`.
