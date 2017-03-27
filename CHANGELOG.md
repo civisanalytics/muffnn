@@ -4,13 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [1.0.1]
+## [1.1.0]
+
+### Added
+
+- Add ability to set the solver and its parameters for the `MLPClassifier` and `MLPRegressor`.
 
 ### Changed
 
 - Removed Docker build.
 - Added `install_requires` to `setup.py`.
 - Updated tests of MLP base class to silence `pytest` warning.
+
+### Fixed
+
+- Fixed `score` method for multilabel classification.
 
 ## [1.0.0] - 2017-02-23
 
