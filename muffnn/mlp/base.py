@@ -255,8 +255,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         t = self._init_model_output(t)
         self._init_model_objective_fn(t)
 
-        self._train_step \
-            = self.solver(**self.solver_kwargs).minimize(self._obj_func)
+        self._train_step = self.solver(
+            **self.solver_kwargs if self.solver_kwargs else {}).minimize(
+            self._obj_func)
 
     def _make_feed_dict(self, X, y=None):
         # Make the dictionary mapping tensor placeholders to input data.
