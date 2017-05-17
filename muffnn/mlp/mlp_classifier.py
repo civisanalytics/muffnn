@@ -76,7 +76,9 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     For multilabel classification, one can pass a 2D int array with 0 or more
     1s per row to `fit`.
 
-    There is currently no dropout for sparse input layers.
+    There is currently no dropout between the sparse input layer and first
+    hidden layer. Dropout on the sparse input layer would undo the benefits of
+    sparsity because the dropout layer is dense.
     """
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,

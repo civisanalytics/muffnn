@@ -36,7 +36,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
 
     Notes
     -----
-    There is currently no dropout for sparse input layers.
+    There is currently no dropout between the sparse input layer and first
+    hidden layer. Dropout on the sparse input layer would undo the benefits of
+    sparsity because the dropout layer is dense.
     """
 
     def _transform_targets(self, y):
