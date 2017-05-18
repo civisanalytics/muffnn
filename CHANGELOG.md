@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - Fixed bug in grid search over solver settings.
+- Fixed bug in `classes_` attribute for multilabel MLP problems. 
 
 ## [1.1.1] - 2017-03-27
 

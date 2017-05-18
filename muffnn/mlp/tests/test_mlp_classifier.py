@@ -63,6 +63,8 @@ def test_check_estimator():
 def check_multilabel_predictions(clf, X, y):
     predicted = clf.fit(X, y).predict(X)
 
+    assert_array_equal(clf.classes_, np.arange(y.shape[1]))
+
     assert_equal(predicted.shape, y.shape)
     assert_array_equal(predicted, y)
 
@@ -80,6 +82,8 @@ def check_multilabel_predictions_na(clf, X, y):
     predicted[is_na] = 0
     y_temp = y.copy()
     y_temp[is_na] = 0
+
+    assert_array_equal(clf.classes_, np.arange(y.shape[1]))
 
     assert_equal(predicted.shape, y_temp.shape)
     assert_array_equal(predicted, y_temp)
