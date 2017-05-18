@@ -204,7 +204,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self._enc = None
-            self.classes_ = np.array([0, 1])
+            self.classes_ = np.arange(y.shape[1])
             self.n_classes_ = y.shape[1]
         else:
             self._enc = LabelEncoder().fit(y)
