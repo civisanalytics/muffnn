@@ -257,8 +257,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
         t = self._init_model_output(t)
         self._init_model_objective_fn(t)
 
-        self._train_step = self.solver(
-            **self.solver_kwargs if self.solver_kwargs else {}).minimize(
+        sk = self.solver_kwargs if self.solver_kwargs else {}
+        self._train_step = self.solver(**sk).minimize(
             self._obj_func)
 
     def _make_feed_dict(self, X, y=None):
