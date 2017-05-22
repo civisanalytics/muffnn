@@ -20,6 +20,6 @@ setup(
     license="BSD-3",
     install_requires=['numpy',
                       'scipy',
-                      'scikit-learn~=0.18.0',
-                      'tensorflow~=1.0.0']
+                      'scikit-learn~=0.18',
+                      'tensorflow~=1.1']
 )

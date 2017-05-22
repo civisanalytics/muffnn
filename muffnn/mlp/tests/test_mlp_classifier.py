@@ -15,10 +15,12 @@ import scipy.sparse as sp
 from sklearn.datasets import load_iris
 from sklearn.linear_model.tests.test_logistic import check_predictions
 from sklearn.utils.estimator_checks import check_estimator
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_equal
+from sklearn.preprocessing import LabelBinarizer, StandardScaler
+from sklearn.model_selection import cross_val_predict, KFold
 from tensorflow import nn
 
 from muffnn import MLPClassifier
@@ -261,3 +263,21 @@ def test_refitting():
     y_binary = (y == y[0]).astype(float)
     clf.fit(X, y_binary)
     assert np.array_equal(clf.classes_, np.unique(y_binary))
+
+
+def test_cross_val_predict():
+    # Make sure it works in cross_val_predict for multiclass.
+
+    X, y = load_iris(return_X_y=True)
+    y = LabelBinarizer().fit_transform(y)
+    X = StandardScaler().fit_transform(X)
+
+    mlp = MLPClassifier(n_epochs=10,
+                        solver_kwargs={'learning_rate': 0.05},
+                        random_state=4567).fit(X, y)
+
+    cv = KFold(n_splits=4, random_state=457, shuffle=True)
+    y_oos = cross_val_predict(mlp, X, y, cv=cv, method='predict_proba')
+    auc = roc_auc_score(y, y_oos, average=None)
+
+    assert np.all(auc >= 0.96)
