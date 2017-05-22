@@ -4,12 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [1.1.2] - ????-??-??
+## [1.1.2] - 2017-05-22
+
+### Changed
+
+- Upgraded to TensorFlow 1.1.X.
 
 ### Fixed
 
 - Fixed bug in grid search over solver settings.
-- Fixed bug in `classes_` attribute for multilabel MLP problems. 
+- Fixed bug in `classes_` attribute for multilabel MLP problems.
 
 ## [1.1.1] - 2017-03-27
 
