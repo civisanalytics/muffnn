@@ -20,7 +20,7 @@ from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_equal
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
-from sklearn.model_selection import cross_val_predict
+from sklearn.model_selection import cross_val_predict, KFold
 from tensorflow import nn
 
 from muffnn import MLPClassifier
@@ -276,7 +276,8 @@ def test_cross_val_predict():
                         solver_kwargs={'learning_rate': 0.05},
                         random_state=4567).fit(X, y)
 
-    y_oos = cross_val_predict(mlp, X, y, cv=4, method='predict_proba')
+    cv = KFold(n_splits=4, random_state=457, shuffle=True)
+    y_oos = cross_val_predict(mlp, X, y, cv=cv, method='predict_proba')
     auc = roc_auc_score(y, y_oos, average=None)
 
     assert np.all(auc >= 0.96)
