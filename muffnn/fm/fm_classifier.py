@@ -154,14 +154,15 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         if self.is_sparse_:
             x_inds = np.vstack(X.nonzero())
             x_srt = np.lexsort(x_inds[::-1, :])
-            x_inds = x_inds[:, x_srt].T
-            x_vals = np.squeeze(np.array(X[x_inds[:, 0], x_inds[:, 1]]))
-            x_shape = X.shape
+            x_inds = x_inds[:, x_srt].T.astype(np.int64)
+            x_vals = np.squeeze(np.array(
+                X[x_inds[:, 0], x_inds[:, 1]])).astype(np.float32)
+            x_shape = np.array(X.shape).astype(np.int64)
             feed_dict = {self._x_inds: x_inds,
                          self._x_vals: x_vals,
                          self._x_shape: x_shape}
         else:
-            feed_dict = {self._x: X}
+            feed_dict = {self._x: X.astype(np.float32)}
 
         if self._output_size == 1:
             feed_dict[self._y] = y.astype(np.float32)

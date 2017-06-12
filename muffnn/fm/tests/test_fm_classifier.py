@@ -40,6 +40,63 @@ class FMClassifierLBFGSB(FMClassifier):
         super().__init__(rank=1, solver='L-BFGS-B', random_state=2)
 
 
+def test_make_feed_dict():
+    """Test that the feed dictionary works ok."""
+    clf = FMClassifier()
+    clf.is_sparse_ = False
+    clf._y = 0
+    clf._x = 1
+    for output_size in [1, 2, 3]:
+        clf._output_size = output_size
+        fd = clf._make_feed_dict(np.array(X), np.array(Y1))
+        assert_array_almost_equal(fd[clf._y], Y1)
+        if output_size == 1:
+            assert fd[clf._y].dtype == np.float32, (
+                "Wrong data type for y w/ output_size = 1 in feed dict!")
+        else:
+            assert fd[clf._y].dtype == np.int32, (
+                "Wrong data type for y w/ output_size > 1 in feed dict!")
+        assert_array_almost_equal(fd[clf._x], X)
+        assert fd[clf._x].dtype == np.float32, (
+            "Wrong data dtype for X in feed dict!")
+
+
+def test_make_feed_dict_sparse():
+    """Test that the feed dictionary works ok for sparse inputs."""
+    clf = FMClassifier()
+    clf.is_sparse_ = True
+    clf._y = 0
+    clf._x_inds = 1
+    clf._x_vals = 2
+    clf._x_shape = 3
+
+    # changing this so test catches indexing errors
+    X = [[-1, 0], [0, 1], [2, 3]]
+
+    for output_size in [1, 2, 3]:
+        clf._output_size = output_size
+        fd = clf._make_feed_dict(np.array(X), np.array(Y1))
+        assert_array_almost_equal(fd[clf._y], Y1)
+        if output_size == 1:
+            assert fd[clf._y].dtype == np.float32, (
+                "Wrong data type for y w/ output_size = 1 in feed dict!")
+        else:
+            assert fd[clf._y].dtype == np.int32, (
+                "Wrong data type for y w/ output_size > 1 in feed dict!")
+
+        # Sparse arrays for TF are in row-major sorted order.
+        assert_array_almost_equal(
+            fd[clf._x_inds], [[0, 0], [1, 1], [2, 0], [2, 1]])
+        assert fd[clf._x_inds].dtype == np.int64, (
+            "Wrong data type for sparse inds in feed dict!")
+        assert_array_almost_equal(fd[clf._x_vals], [-1, 1, 2, 3])
+        assert fd[clf._x_vals].dtype == np.float32, (
+            "Wrong data type for sparse vals in feed dict!")
+        assert_array_almost_equal(fd[clf._x_shape], [3, 2])
+        assert fd[clf._x_shape].dtype == np.int64, (
+            "Wrong data type for sparse shape in feed dict!")
+
+
 def test_check_estimator():
     """Check adherence to Estimator API."""
     check_estimator(FMClassifierLBFGSB)
