@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import logging
+import re
 
 import scipy.sparse as sp
 import numpy as np
@@ -225,7 +226,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         -------
         self : returns an instance of self.
         """
-        # _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
+        _LOGGER.info("Fitting %s", re.sub(r"\s+", r" ", repr(self)))
 
         # Mark the model as not fitted (i.e., not fully initialized based on
         # the data).
