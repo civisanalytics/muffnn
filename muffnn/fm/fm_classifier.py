@@ -110,11 +110,11 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             self._beta0 = tf.get_variable("beta0", [self._output_size])
 
         vx = tf.stack([matmul(self._x, self._v[i, :, :])
-                       for i in range(self.rank)], axis=1)
+                       for i in range(self.rank)], axis=-1)
         v2 = self._v * self._v
         v2x2 = tf.stack([matmul(x2, v2[i, :, :])
-                         for i in range(self.rank)], axis=1)
-        int_term = 0.5 * tf.reduce_sum(tf.square(vx) - v2x2, axis=1)
+                         for i in range(self.rank)], axis=-1)
+        int_term = 0.5 * tf.reduce_sum(tf.square(vx) - v2x2, axis=-1)
         self._logit_y_proba \
             = self._beta0 + matmul(self._x, self._beta) + int_term
 

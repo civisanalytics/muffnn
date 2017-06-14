@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 import pytest
 import scipy.sparse as sp
+from scipy.misc import logsumexp
 from sklearn.datasets import load_iris
 from sklearn.linear_model.tests.test_logistic import check_predictions
 from sklearn.utils.estimator_checks import check_estimator
@@ -196,3 +197,59 @@ def test_cross_val_predict():
     acc = accuracy_score(y, y_oos)
 
     assert acc >= 0.90, "accuracy is too low for iris in cross_val_predict!"
+
+
+def test_model_computations_sigmoid():
+    """Make sure we did the FM comps right sigmoid."""
+    clf = FMClassifier(random_state=42)
+    clf.fit(X, Y1)
+    y_proba = clf.predict_proba(X)
+
+    v = clf._v.eval(session=clf._session)
+    beta = clf._beta.eval(session=clf._session)
+    beta0 = clf._beta0.eval(session=clf._session)
+
+    logit_y_proba = beta0 + np.dot(X, beta)
+    _X = np.array(X)
+    for i in range(2):
+        for j in range(i+1, 2):
+            _vals = []
+            for k in range(v.shape[2]):
+                _vals.append(np.dot(v[:, i, k], v[:, j, k]))
+            logit_y_proba += ((_X[:, i] * _X[:, j])[:, np.newaxis] *
+                              np.column_stack(_vals))
+
+    y_proba_test = 1.0 / (1.0 + np.exp(-logit_y_proba))
+    if y_proba_test.ndim == 1:
+        y_proba_test = y_proba_test[:, np.newaxis]
+
+    if y_proba_test.shape[1] == 1:
+        y_proba_test = np.column_stack([1.0 - y_proba_test[:, 0],
+                                        y_proba_test[:, 0]])
+
+    assert_array_almost_equal(y_proba, y_proba_test)
+
+
+def test_model_computations_softmax():
+    """Make sure we did the FM comps right for softmax."""
+    clf = FMClassifier(random_state=42)
+    clf.fit(X, Y2)
+    y_proba = clf.predict_proba(X)
+
+    v = clf._v.eval(session=clf._session)
+    beta = clf._beta.eval(session=clf._session)
+    beta0 = clf._beta0.eval(session=clf._session)
+
+    logit_y_proba = beta0 + np.dot(X, beta)
+    _X = np.array(X)
+    for i in range(2):
+        for j in range(i+1, 2):
+            _vals = []
+            for k in range(v.shape[2]):
+                _vals.append(np.dot(v[:, i, k], v[:, j, k]))
+            logit_y_proba += ((_X[:, i] * _X[:, j])[:, np.newaxis] *
+                              np.column_stack(_vals))
+
+    y_proba_test = np.exp(logit_y_proba -
+                          logsumexp(logit_y_proba, axis=-1)[:, np.newaxis])
+    assert_array_almost_equal(y_proba, y_proba_test)
