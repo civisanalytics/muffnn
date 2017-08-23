@@ -4,6 +4,8 @@ Tests for the FM classifier.
 based in part on sklearn's logistic tests:
 https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/tests/test_logistic.py
 """
+from __future__ import print_function
+from __future__ import division
 
 from io import BytesIO
 import pickle
@@ -38,10 +40,11 @@ SGD_KWARGS = {"random_state": 2,
 
 class FMClassifierLBFGSB(FMClassifier):
     def __init__(self):
-        super().__init__(rank=1, solver='L-BFGS-B', random_state=2)
+        super(FMClassifierLBFGSB, self).__init__(
+            rank=1, solver='L-BFGS-B', random_state=2)
 
     def predict_proba(self, *args, **kwargs):
-        res = super().predict_proba(*args, **kwargs)
+        res = super(FMClassifierLBFGSB, self).predict_proba(*args, **kwargs)
         res = res.astype(np.float64)
         res /= np.sum(res, axis=1).reshape(-1, 1)
         return res

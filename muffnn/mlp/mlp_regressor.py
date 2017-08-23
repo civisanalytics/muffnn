@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-
 """
 A Deep Neural Network (multilayer Perceptron) sklearn-style regressor.
 
 Similar to sklearn.neural_network.MLPRegressor, but using TensorFlow.
 """
+from __future__ import print_function
+from __future__ import division
 
 import logging
 from warnings import warn
@@ -159,7 +159,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         return y_pred
 
     def __getstate__(self):
-        state = super().__getstate__()
+        state = super(MLPRegressor, self).__getstate__()
 
         # Add the fitted attributes particular to this subclass.
         if self._is_fitted:

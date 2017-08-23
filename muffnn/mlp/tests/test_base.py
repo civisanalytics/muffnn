@@ -1,11 +1,19 @@
+from __future__ import print_function
+from __future__ import division
+
 from io import BytesIO
 import pickle
-import unittest.mock
 
+import six
 import numpy as np
 import scipy.sparse
 import tensorflow as tf
 from tensorflow.python.ops import nn
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 import muffnn.mlp.base as base
 
@@ -77,7 +85,7 @@ def test_make_feed_dict_other():
     np.testing.assert_array_equal(feed_dict['input_targets'], y)
 
 
-@unittest.mock.patch.object(base.tf, 'Session')
+@mock.patch.object(base.tf, 'Session')
 def test_fit_monitor(mock_Session):
     # Ensure that we loop through batches and epochs appropriately
     # while respecting the monitor function's ability to cause
