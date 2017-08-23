@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Python 2.7 compatibility (#57).
+
 ### Changed
 
+- Moved to Travis instead of CircleCI (#57).
 - Upgraded to TensorFlow 1.3.X.
 - Upgraded to numpy 1.13.1.
 - Upgraded to scipy 0.19.1.
