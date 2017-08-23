@@ -5,7 +5,6 @@ import re
 import scipy.sparse as sp
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.opt import ScipyOptimizerInterface
 
 from sklearn.base import ClassifierMixin, BaseEstimator
 from sklearn.utils import check_X_y, check_array, check_random_state
@@ -141,6 +140,8 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                 += self.lambda_beta * tf.reduce_sum(tf.square(self._beta))
 
         if isinstance(self.solver, str):
+            from tensorflow.contrib.opt import ScipyOptimizerInterface
+
             self._train_step = ScipyOptimizerInterface(
                 self._obj_func,
                 method=self.solver,
