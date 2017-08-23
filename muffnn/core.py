@@ -18,6 +18,9 @@ else:
     import sys as _sys
     import warnings as _warnings
 
+    class ResourceWarning(Warning):
+        pass
+
     # from civis-python (civis.compat)
     # copied here to avoid the dependency
     class TemporaryDirectory(object):
