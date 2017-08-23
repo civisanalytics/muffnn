@@ -25,12 +25,12 @@ from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from sklearn.model_selection import cross_val_predict, KFold
 from tensorflow import nn
 
+from muffnn import MLPClassifier
+
 if six.PY2:
     from mock import MagicMock
 else:
     from unittest.mock import MagicMock
-
-from muffnn import MLPClassifier
 
 
 iris = load_iris()

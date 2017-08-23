@@ -10,12 +10,12 @@ import scipy.sparse
 import tensorflow as tf
 from tensorflow.python.ops import nn
 
+import muffnn.mlp.base as base
+
 if six.PY2:
     import mock
 else:
     from unittest import mock
-
-import muffnn.mlp.base as base
 
 
 class SimpleTestEstimator(base.MLPBaseEstimator):
