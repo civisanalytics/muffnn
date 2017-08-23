@@ -56,6 +56,12 @@ class MLPClassifierManyEpochs(MLPClassifier):
                          activation=activation, init_scale=init_scale,
                          random_state=42)
 
+    def predict_proba(self, *args, **kwargs):
+        res = super().predict_proba(*args, **kwargs)
+        res = res.astype(np.float64)
+        res /= np.sum(res, axis=1).reshape(-1, 1)
+        return res
+
 
 def test_check_estimator():
     """Check adherence to Estimator API."""
