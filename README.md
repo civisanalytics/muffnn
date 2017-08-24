@@ -19,8 +19,7 @@ You can install the dependencies via:
 pip install -r requirements.txt
 ```
 
-Google provides TensorFlow pip wheels for different OSs and architectures.
-See [this page](https://www.tensorflow.org/install/) for more details.
+If you have trouble installing TensorFlow, see [this page](https://www.tensorflow.org/install/) for more details.
 
 For development, a few additional dependencies are needed:
 
