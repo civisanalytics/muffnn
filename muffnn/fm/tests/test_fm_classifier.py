@@ -40,6 +40,12 @@ class FMClassifierLBFGSB(FMClassifier):
     def __init__(self):
         super().__init__(rank=1, solver='L-BFGS-B', random_state=2)
 
+    def predict_proba(self, *args, **kwargs):
+        res = super().predict_proba(*args, **kwargs)
+        res = res.astype(np.float64)
+        res /= np.sum(res, axis=1).reshape(-1, 1)
+        return res
+
 
 def test_make_feed_dict():
     """Test that the feed dictionary works ok."""

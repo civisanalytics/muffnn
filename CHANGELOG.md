@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded to TensorFlow 1.3.X.
+- Upgraded to numpy 1.13.1.
+- Upgraded to scipy 0.19.1.
+- Upgraded to scikit-learn 0.19.0.
+- Upgraded to python 3.6.2.
+
 ### Fixed
+
 - Hid slow import of `tf.contrib` (#54).
 
 ## [1.1.2] - 2017-05-22
