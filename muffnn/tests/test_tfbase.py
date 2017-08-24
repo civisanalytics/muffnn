@@ -1,6 +1,9 @@
 """
 Tests for TFPicklingBase
 """
+from __future__ import print_function
+from __future__ import division
+
 import io
 import pickle
 import numpy as np
@@ -36,7 +39,7 @@ class TFAdder(TFPicklingBase):
         return val
 
     def __getstate__(self):
-        state = super().__getstate__()
+        state = super(TFAdder, self).__getstate__()
 
         # add add_val to state
         state['add_val'] = self.add_val

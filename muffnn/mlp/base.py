@@ -1,13 +1,14 @@
-#!/usr/bin/env python3
-
 """
 A Deep Neural Network (multilayer Perceptron) sklearn-style estimator abstract
 class.
 
 Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 """
+from __future__ import print_function
+from __future__ import division
 
 from abc import ABCMeta, abstractmethod
+import six
 import logging
 import re
 from warnings import warn
@@ -31,7 +32,8 @@ from muffnn.core import TFPicklingBase, affine
 _LOGGER = logging.getLogger(__name__)
 
 
-class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
+@six.add_metaclass(ABCMeta)
+class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
     """Base class for multilayer perceptron models
 
     Notes
@@ -187,7 +189,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
 
     def __getstate__(self):
         # Handles TF persistence
-        state = super().__getstate__()
+        state = super(MLPBaseEstimator, self).__getstate__()
 
         # Add attributes of this estimator
         state.update(dict(activation=self.activation,

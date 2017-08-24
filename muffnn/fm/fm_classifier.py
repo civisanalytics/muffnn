@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+from __future__ import print_function
+from __future__ import division
+
 import logging
 import re
 
@@ -188,7 +190,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
 
     def __getstate__(self):
         # Handles TF persistence
-        state = super().__getstate__()
+        state = super(FMClassifier, self).__getstate__()
 
         # Add attributes of this estimator
         state.update(dict(rank=self.rank,

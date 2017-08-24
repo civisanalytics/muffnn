@@ -1,6 +1,8 @@
 """
 Tests for the Autoencoder.
 """
+from __future__ import print_function
+from __future__ import division
 
 import logging
 import pprint
@@ -258,8 +260,8 @@ def test_mse_sigmoid_activations():
     _LOGGER.warning("\ntest info:\n    ae: %s\n"
                     "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
                     str(ae), ae_score,
-                    pprint.pformat(list(X[10]), compact=True),
-                    pprint.pformat(list(Xdec[10]), compact=True))
+                    pprint.pformat(list(X[10])),
+                    pprint.pformat(list(Xdec[10])))
 
     assert ae_score < max_score, ("Autoencoder should have a score "
                                   "less than %f for the iris features." %
@@ -331,8 +333,8 @@ def test_sigmoid_softmax_cross_entropy_loss():
         _LOGGER.warning("\ntest info:\n    ae: %s\n"
                         "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
                         str(ae), ae_score,
-                        pprint.pformat(list(X[10]), compact=True),
-                        pprint.pformat(list(Xdec[10]), compact=True))
+                        pprint.pformat(list(X[10])),
+                        pprint.pformat(list(Xdec[10])))
 
         assert ae_score < 2.5, ("Autoencoder should have a score "
                                 "less than 2.5 for the iris features.")
@@ -486,8 +488,8 @@ def _check_ae(max_score,
     _LOGGER.warning("\ntest info:\n    ae: %s\n    sparse format: %s\n"
                     "    score: %g\n    X[10]: %s\n    Xdec[10]: %s",
                     str(ae), sparse_type, ae_score,
-                    pprint.pformat(list(X[10]), compact=True),
-                    pprint.pformat(list(Xdec[10]), compact=True))
+                    pprint.pformat(list(X[10])),
+                    pprint.pformat(list(Xdec[10])))
 
     assert ae_score < max_score, ("Autoencoder should have a score "
                                   "less than %f for the iris features." %

@@ -1,13 +1,21 @@
+from __future__ import print_function
+from __future__ import division
+
 from io import BytesIO
 import pickle
-import unittest.mock
 
+import six
 import numpy as np
 import scipy.sparse
 import tensorflow as tf
 from tensorflow.python.ops import nn
 
 import muffnn.mlp.base as base
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 
 class SimpleTestEstimator(base.MLPBaseEstimator):
@@ -77,14 +85,14 @@ def test_make_feed_dict_other():
     np.testing.assert_array_equal(feed_dict['input_targets'], y)
 
 
-@unittest.mock.patch.object(base.tf, 'Session')
+@mock.patch.object(base.tf, 'Session')
 def test_fit_monitor(mock_Session):
     # Ensure that we loop through batches and epochs appropriately
     # while respecting the monitor function's ability to cause
     # early stopping.
     mock_Session().run.return_value = (
-        unittest.mock.MagicMock(), unittest.mock.MagicMock())
-    mock_eval = unittest.mock.MagicMock(return_value=False)
+        mock.MagicMock(), mock.MagicMock())
+    mock_eval = mock.MagicMock(return_value=False)
 
     X = np.reshape(np.arange(9), (3, 3))
     y = np.arange(3)
@@ -105,7 +113,7 @@ def test_fit_monitor(mock_Session):
 
     mock_Session.reset_mock()
     mock_eval.reset_mock()
-    mock_eval = unittest.mock.MagicMock(return_value=True)
+    mock_eval = mock.MagicMock(return_value=True)
     clf = SimpleTestEstimator(n_epochs=10, batch_size=3)
     clf.fit(X, y, monitor=mock_eval)
     # Our monitor returns true, so it should only do one epoch
@@ -150,7 +158,7 @@ def test_partial_fit_random_state():
     pickle.dump(clf, buf)
 
     # Instrument the function for making TF inputs.
-    mock_make_feed_dict = unittest.mock.MagicMock()
+    mock_make_feed_dict = mock.MagicMock()
     mock_make_feed_dict.side_effect = clf._make_feed_dict
     clf._make_feed_dict = mock_make_feed_dict
 
@@ -166,7 +174,7 @@ def test_partial_fit_random_state():
     # the same.
     buf.seek(0)
     clf = pickle.load(buf)
-    mock_make_feed_dict = unittest.mock.MagicMock()
+    mock_make_feed_dict = mock.MagicMock()
     mock_make_feed_dict.side_effect = clf._make_feed_dict
     clf._make_feed_dict = mock_make_feed_dict
     for _ in range(n_calls):

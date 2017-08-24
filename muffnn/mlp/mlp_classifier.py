@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-
 """
 A Deep Neural Network (multilayer Perceptron) sklearn-style classifier.
 
 Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 """
+from __future__ import print_function
+from __future__ import division
 
 import logging
 
@@ -174,7 +174,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         This is based on
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
-        return super().partial_fit(X, y, monitor=monitor, classes=classes)
+        return super(MLPClassifier, self).partial_fit(
+            X, y, monitor=monitor, classes=classes)
 
     def _is_multilabel(self, y):
         """
@@ -261,7 +262,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             return self.classes_[indices]
 
     def __getstate__(self):
-        state = super().__getstate__()
+        state = super(MLPClassifier, self).__getstate__()
 
         # Add the fitted attributes particular to this subclass.
         if self._is_fitted:

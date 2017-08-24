@@ -1,6 +1,9 @@
 """
 Autoencoder in scikit-learn style with TensorFlow
 """
+from __future__ import print_function
+from __future__ import division
+
 import logging
 import re
 import warnings
@@ -411,7 +414,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
     def __getstate__(self):
         # Handles TF persistence
-        state = super().__getstate__()
+        state = super(Autoencoder, self).__getstate__()
 
         # Add attributes of this estimator
         state.update(dict(hidden_activation=self.hidden_activation,

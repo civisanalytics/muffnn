@@ -4,11 +4,13 @@ Tests for MLP classifier
 based in part on sklearn's logistic tests:
 https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/tests/test_logistic.py
 """
+from __future__ import print_function
+from __future__ import division
 
 from io import BytesIO
 import pickle
-from unittest.mock import MagicMock
 
+import six
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -24,6 +26,11 @@ from sklearn.model_selection import cross_val_predict, KFold
 from tensorflow import nn
 
 from muffnn import MLPClassifier
+
+if six.PY2:
+    from mock import MagicMock
+else:
+    from unittest.mock import MagicMock
 
 
 iris = load_iris()
@@ -51,13 +58,15 @@ class MLPClassifierManyEpochs(MLPClassifier):
 
     def __init__(self, hidden_units=(256,), batch_size=64,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1):
-        super().__init__(hidden_units=hidden_units, batch_size=batch_size,
-                         n_epochs=100, keep_prob=keep_prob,
-                         activation=activation, init_scale=init_scale,
-                         random_state=42)
+        super(MLPClassifierManyEpochs, self).__init__(
+            hidden_units=hidden_units, batch_size=batch_size,
+            n_epochs=100, keep_prob=keep_prob,
+            activation=activation, init_scale=init_scale,
+            random_state=42)
 
     def predict_proba(self, *args, **kwargs):
-        res = super().predict_proba(*args, **kwargs)
+        res = super(MLPClassifierManyEpochs, self).predict_proba(
+            *args, **kwargs)
         res = res.astype(np.float64)
         res /= np.sum(res, axis=1).reshape(-1, 1)
         return res
