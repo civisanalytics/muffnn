@@ -207,11 +207,12 @@ def test_monitor_ae():
 
     def _monitor(epoch, est, stats):
         assert epoch <= 1000, "The autoencoder has been running too long!"
-        if stats['loss'] < 0.4:
+        if stats['loss'] < 0.2:
+            assert epoch > 10, "The autoencoder returned too soon!"
             return True
         else:
             return False
-    ae.fit(X)
+    ae.fit(X, monitor=_monitor)
 
 
 def test_errors_loss_output_activation():
