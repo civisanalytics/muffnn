@@ -516,13 +516,22 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             raise ValueError("Sigmoid indices and softmax indices cannot"
                              " overlap!")
 
-    def partial_fit(self, X, y=None):
+    def partial_fit(self, X, y=None, monitor=None, **kwargs):
         """Fit the autoencoder on a batch of training data.
 
         Parameters
         ----------
         X : numpy array or sparse matrix of shape [n_samples, n_features]
             Training data
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -575,14 +584,30 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
             self._random_state.shuffle(indices)
 
             while True:
-                batch_ind = indices[start_idx:start_idx + self.batch_size]
+                batch_ind = indices[
+                    start_idx:min(start_idx + self.batch_size, n_examples)]
                 feed_dict = self._make_feed_dict(X[batch_ind], training=True)
                 obj_val, _ = self._session.run(
                     [self._obj_func, self._train_step], feed_dict=feed_dict)
-                _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
-                             obj_val, epoch, start_idx)
+                _LOGGER.debug(
+                    "objective: %.4f, epoch: %d, idx: %d",
+                    obj_val, epoch, start_idx)
+
                 start_idx += self.batch_size
+
+                # are we at the end of an epoch?
                 if start_idx > n_examples - self.batch_size:
+                    _LOGGER.info(
+                        "objective: %.4f, epoch: %d, idx: %d",
+                        obj_val, epoch, start_idx)
+
+                    if monitor:
+                        stop_early = monitor(epoch, self, {'loss': obj_val})
+                        if stop_early:
+                            _LOGGER.info(
+                                "stopping early due to monitor function.")
+                            return self
+
                     start_idx = 0
                     epoch += 1
                     if epoch >= self.n_epochs:
@@ -591,13 +616,22 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
 
         return self
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None, monitor=None, **kwargs):
         """Fit the autoencoder.
 
         Parameters
         ----------
         X : numpy array or sparse matrix of shape [n_samples, n_features]
             Training data
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshoting.
 
         Returns
         -------
@@ -610,7 +644,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
         self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X)
+        return self.partial_fit(X, monitor=monitor, **kwargs)
 
     def transform(self, X, y=None):
         """Encode data with the autoencoder.
