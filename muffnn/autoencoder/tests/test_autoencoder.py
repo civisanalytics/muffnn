@@ -190,6 +190,30 @@ def test_errors_unallowed_loss():
             "Wrong error raised for testing unallowed losses!")
 
 
+def test_monitor_ae():
+    """Test the monitor keyword."""
+    # Use the iris features.
+    X = iris.data
+    X = MinMaxScaler().fit_transform(X)
+
+    ae = Autoencoder(hidden_units=(3, 2,),
+                     n_epochs=7500,
+                     random_state=4556,
+                     learning_rate=DEFAULT_LEARNING_RATE,
+                     keep_prob=1.0,
+                     hidden_activation=tf.nn.sigmoid,
+                     encoding_activation=tf.nn.sigmoid,
+                     output_activation=tf.nn.sigmoid)
+
+    def _monitor(epoch, est, stats):
+        assert epoch <= 1000, "The autoencoder has been running too long!"
+        if stats['loss'] < 0.4:
+            return True
+        else:
+            return False
+    ae.fit(X)
+
+
 def test_errors_loss_output_activation():
     """Make sure cross-entropy loss with activations not equal to
     `tensorflow.nn.sigmoid` or `tensorflow.nn.softmax` fails."""
