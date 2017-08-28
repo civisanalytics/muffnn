@@ -589,14 +589,16 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 feed_dict = self._make_feed_dict(X[batch_ind], training=True)
                 obj_val, _ = self._session.run(
                     [self._obj_func, self._train_step], feed_dict=feed_dict)
-                _LOGGER.debug("objective: %.4f, epoch: %d, idx: %d",
-                             obj_val, epoch, start_idx)
+                _LOGGER.debug(
+                    "objective: %.4f, epoch: %d, idx: %d",
+                    obj_val, epoch, start_idx)
 
                 start_idx += self.batch_size
 
                 # are we at the end of an epoch?
                 if start_idx > n_examples - self.batch_size:
-                    _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
+                    _LOGGER.info(
+                        "objective: %.4f, epoch: %d, idx: %d",
                         obj_val, epoch, start_idx)
 
                     if monitor:
