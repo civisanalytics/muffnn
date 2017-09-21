@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Python 2.7 compatibility (#57).
 - Added a `monitor` keyword to the autoencoder (#58).
+- Added a factorization machine classifier (#50).
 
 ### Changed
 
