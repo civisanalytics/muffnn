@@ -4,11 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [1.2.0] - 2017-09-21
 
 ### Added
 
 - Python 2.7 compatibility (#57).
+- Added a `monitor` keyword to the autoencoder (#58).
+- Added a factorization machine classifier (#50).
 
 ### Changed
 
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Upgraded to scipy 0.19.1.
 - Upgraded to scikit-learn 0.19.0.
 - Upgraded to python 3.6.2.
+- Upgraded requirements to match python 2 properly (#59).
 
 ### Fixed
 
