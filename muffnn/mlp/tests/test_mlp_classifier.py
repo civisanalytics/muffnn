@@ -299,3 +299,14 @@ def test_cross_val_predict():
     auc = roc_auc_score(y, y_oos, average=None)
 
     assert np.all(auc >= 0.96)
+
+def test_embedding():
+    # Check that fitting twice works (e.g., to make sure that fit-related
+    # variables are cleared appropriately when refitting).
+
+    X, y = iris.data, iris.target
+
+    clf = MLPClassifier(n_epochs=1)
+    clf.fit(X, y)
+
+    assert clf._compute_embedding(X).shape[1] == 256

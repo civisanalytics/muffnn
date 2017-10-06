@@ -252,6 +252,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 if self.keep_prob != 1.0:
                     t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
+
+            if self.transform_layer_index == i:
+                self.transform_layer_ = t
+
             t = t if self.activation is None else self.activation(t)
 
         # The output layer and objective function depend on the model
@@ -317,13 +321,43 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 start_idx += self.batch_size
                 pred_batches.append(
                     self._session.run(self.output_layer_, feed_dict=feed_dict))
-        y_pred = np.concatenate(pred_batches)
-        return y_pred
+        embedding = np.concatenate(pred_batches)
+        return embedding
 
     @abstractmethod
     def predict(self, X):
         pass
 
+    def _compute_embedding(self, X):
+        """Get the outputs of the network, for use in prediction methods."""
+
+        if not self._is_fitted:
+            raise NotFittedError("Call fit before prediction")
+
+        X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])
+
+        if self.is_sparse_:
+            # For sparse input, make the input a CSR matrix since it can be
+            # indexed by row.
+            X = X.tocsr() if sp.issparse(X) else sp.csr_matrix(X)
+        elif sp.issparse(X):
+            # Convert sparse input to dense.
+            X = X.todense().A
+
+        # Make predictions in batches.
+        pred_batches = []
+        start_idx = 0
+        n_examples = X.shape[0]
+        with self.graph_.as_default():
+            while start_idx < n_examples:
+                X_batch = \
+                    X[start_idx:min(start_idx + self.batch_size, n_examples)]
+                feed_dict = self._make_feed_dict(X_batch)
+                start_idx += self.batch_size
+                pred_batches.append(
+                    self._session.run(self.transform_layer_, feed_dict=feed_dict))
+        y_pred = np.concatenate(pred_batches)
+        return y_pred
 
 def _sparse_matrix_data(X):
     """Prepare the sparse matrix for conversion to TensorFlow.
