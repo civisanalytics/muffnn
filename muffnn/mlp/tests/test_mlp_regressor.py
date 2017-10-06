@@ -92,3 +92,15 @@ def test_partial_fit():
 
     y_pred = clf.predict(X)
     assert pearsonr(y_pred, y)[0] > 0.5
+
+
+def test_embedding():
+    # Check that fitting twice works (e.g., to make sure that fit-related
+    # variables are cleared appropriately when refitting).
+
+    X, y = iris.data, iris.target
+
+    clf = MLPRegressor(n_epochs=1)
+    clf.fit(X, y)
+
+    assert clf._compute_embedding(X).shape[1] == 256

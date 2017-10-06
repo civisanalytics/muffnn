@@ -321,8 +321,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 start_idx += self.batch_size
                 pred_batches.append(
                     self._session.run(self.output_layer_, feed_dict=feed_dict))
-        embedding = np.concatenate(pred_batches)
-        return embedding
+        y_pred = np.concatenate(pred_batches)
+        return y_pred
 
     @abstractmethod
     def predict(self, X):
@@ -354,10 +354,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     X[start_idx:min(start_idx + self.batch_size, n_examples)]
                 feed_dict = self._make_feed_dict(X_batch)
                 start_idx += self.batch_size
-                pred_batches.append(
+                embed_batches.append(
                     self._session.run(self.transform_layer_, feed_dict=feed_dict))
-        y_pred = np.concatenate(pred_batches)
-        return y_pred
+        embedding = np.concatenate(embed_batches)
+        return embedding
 
 def _sparse_matrix_data(X):
     """Prepare the sparse matrix for conversion to TensorFlow.
