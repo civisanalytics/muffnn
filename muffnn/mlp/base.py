@@ -345,7 +345,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             X = X.todense().A
 
         # Make predictions in batches.
-        pred_batches = []
+        embed_batches = []
         start_idx = 0
         n_examples = X.shape[0]
         with self.graph_.as_default():
