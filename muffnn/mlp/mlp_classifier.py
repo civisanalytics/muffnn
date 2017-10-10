@@ -229,7 +229,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         C : array, shape = (n_samples, n_classes)
             Predicted probabilities for each class
         """
-        y_pred = self._compute_output(X)
+        y_pred = self._compute_embedding(X)
 
         if len(y_pred.shape) == 1:
             # The TF models returns a 1d array for binary models.
@@ -254,7 +254,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             for each input. For multilabel, it returns a 2-d array with rows of
             0/1 indicators, one per label, for each input.
         """
-        class_probs = self.predict_proba(X)
+        class_probs = self._compute_embedding(X)
 
         if self.multilabel_:
             return (class_probs >= 0.5).astype(np.int)
