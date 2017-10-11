@@ -260,7 +260,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             return (class_probs >= 0.5).astype(np.int)
         else:
             indices = class_probs.argmax(axis=1)
-            return self.classes_[indices]
+            return class_probs
 
     def __getstate__(self):
         state = super(MLPClassifier, self).__getstate__()
