@@ -253,7 +253,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
 
-            if self.transform_layer_index == i:
+            if self._transform_layer == i:
                 self.transform_layer_ = t
 
             t = t if self.activation is None else self.activation(t)
@@ -290,6 +290,11 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         else:
             feed_dict[self.input_targets_] = y
             feed_dict[self._keep_prob] = self.keep_prob
+
+        if self.transform_layer is None:
+            feed_dict[self._transform_layer] = len(self.hidden_units)
+        else:
+            feed_dict[self._transform_layer] = self.transform_layer
 
         return feed_dict
 
@@ -328,8 +333,18 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
     def predict(self, X):
         pass
 
-    def _compute_embedding(self, X):
-        """Get the outputs of the network, for use in prediction methods."""
+    def transform(self, X):
+        """Transforms input into hidden layer of users choice
+
+        Parameters
+        ----------
+        X : sparse matrix
+
+        Returns
+        -------
+        np.array : numpy array with shape (len(X), hiden_units )
+                  embedding layer
+        """
 
         if not self._is_fitted:
             raise NotFittedError("Call fit before prediction")
