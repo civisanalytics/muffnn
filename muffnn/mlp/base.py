@@ -125,7 +125,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
 
             # Set which layer transform function points to
             if self.transform_layer_index is None:
-                self._transform_layer_index = len(self.hidden_units)
+                self._transform_layer_index = len(self.hidden_units) - 1
             else:
                 self._transform_layer_index = self.transform_layer_index
 
