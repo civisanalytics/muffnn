@@ -142,12 +142,12 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
 
-        #Set which layer transform function points to
+        # Set which layer transform function points to
         if self.transform_layer is None:
-                  self._transform_layer = len(self.hidden_units)
+                  self._transform_layer_index = len(self.hidden_units)
         else:
-            self._transform_layer = self.transform_layer
-          
+            self._transform_layer_index = self.transform_layer_index
+
 
         # Train the model with the given data.
         with self.graph_.as_default():
@@ -260,7 +260,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
 
-            if self._transform_layer == i:
+            if self._transform_layer_index == i:
                 self.transform_layer_ = t
 
             t = t if self.activation is None else self.activation(t)
@@ -297,11 +297,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         else:
             feed_dict[self.input_targets_] = y
             feed_dict[self._keep_prob] = self.keep_prob
-
-        if self.transform_layer is None:
-            feed_dict[self._transform_layer] = len(self.hidden_units)
-        else:
-            feed_dict[self._transform_layer] = self.transform_layer
 
         return feed_dict
 

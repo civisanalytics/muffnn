@@ -1,10 +1,10 @@
+#!/usr/bin/env python3
+
 """
 A Deep Neural Network (multilayer Perceptron) sklearn-style classifier.
 
 Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 """
-from __future__ import print_function
-from __future__ import division
 
 import logging
 
@@ -49,16 +49,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         `uniform_unit_scaling_initializer
         <https://www.tensorflow.org/versions/r0.8/api_docs/python/state_ops.html#uniform_unit_scaling_initializer>`,
         is used.
-    random_state : int, RandomState instance or None, optional
+    random_state: int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
         used.
-    solver : a subclass of `tf.train.Optimizer`, optional
-        The solver to use to minimize the loss.
-    solver_kwargs : dict, optional
-        Additional keyword arguments to pass to `solver` upon construction.
-        See the TensorFlow documentation for possible options. Typically,
-        one would want to set the `learning_rate`.
 
     Attributes
     ----------
@@ -73,18 +67,17 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
     Notes
     -----
+    tensorflow's Adam implementation is used for optimization.
+
     For multilabel classification, one can pass a 2D int array with 0 or more
     1s per row to `fit`.
 
-    There is currently no dropout between the sparse input layer and first
-    hidden layer. Dropout on the sparse input layer would undo the benefits of
-    sparsity because the dropout layer is dense.
+    There is currently no dropout for sparse input layers.
     """
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1,
-                 random_state=None, solver=tf.train.AdamOptimizer,
-                 solver_kwargs=None, transform_layer_index=0):
+                 random_state=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -92,9 +85,6 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         self.activation = activation
         self.init_scale = init_scale
         self.random_state = random_state
-        self.solver = solver
-        self.solver_kwargs = solver_kwargs
-        self.transform_layer_index = transform_layer_index
 
     def _init_model_output(self, t):
 
@@ -130,6 +120,19 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
     def _init_model_objective_fn(self, t):
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+<<<<<<< HEAD
+                t, tf.cast(self.input_targets_, np.float32))
+            y_finite = tf.equal(self.input_targets_, -1)
+            self._obj_func = tf.reduce_mean(
+                tf.select(y_finite, self._zeros, cross_entropy))
+        elif self.n_classes_ > 2:
+            cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                t, self.input_targets_)
+            self._obj_func = tf.reduce_mean(cross_entropy)
+        else:
+            cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+                t, tf.cast(self.input_targets_, np.float32))
+=======
                 logits=t, labels=tf.cast(self.input_targets_, np.float32))
             y_finite = tf.equal(self.input_targets_, -1)
             self._obj_func = tf.reduce_mean(
@@ -141,6 +144,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=t, labels=tf.cast(self.input_targets_, np.float32))
+>>>>>>> 4efad81fe680554c62ed7aa85a6ff9b1314270eb
             self._obj_func = tf.reduce_mean(cross_entropy)
 
     def partial_fit(self, X, y, monitor=None, classes=None):
@@ -175,8 +179,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         This is based on
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
-        return super(MLPClassifier, self).partial_fit(
-            X, y, monitor=monitor, classes=classes)
+        return super().partial_fit(X, y, monitor=monitor, classes=classes)
 
     def _is_multilabel(self, y):
         """
@@ -206,7 +209,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
 
         if self.multilabel_:
             self._enc = None
-            self.classes_ = np.arange(y.shape[1])
+            self.classes_ = np.array([0, 1])
             self.n_classes_ = y.shape[1]
         else:
             self._enc = LabelEncoder().fit(y)
@@ -263,7 +266,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             return self.classes_[indices]
 
     def __getstate__(self):
-        state = super(MLPClassifier, self).__getstate__()
+        state = super().__getstate__()
 
         # Add the fitted attributes particular to this subclass.
         if self._is_fitted:
@@ -273,8 +276,3 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             state['n_classes_'] = self.n_classes_
 
         return state
-
-    def score(self, X, y):
-        accuracy = np.array(y) == self.predict(X)
-        accuracy = accuracy[np.array(y) != -1].mean()
-        return accuracy
