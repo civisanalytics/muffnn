@@ -112,9 +112,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         X, y = self._check_inputs(X, y)
         assert self.batch_size > 0, "batch_size <= 0"
 
-        if self.transform_layer is None:
-          self._transform_layer = len(self.hidden_units)
-
         # Initialize the model if it hasn't been already by a previous call.
         if self._is_fitted:
             y = self._transform_targets(y)
@@ -144,6 +141,13 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
 
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
+
+        #Set which layer transform function points to
+        if self.transform_layer is None:
+                  self._transform_layer = len(self.hidden_units)
+        else:
+            self._transform_layer = self.transform_layer
+          
 
         # Train the model with the given data.
         with self.graph_.as_default():
