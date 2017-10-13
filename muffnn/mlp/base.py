@@ -143,7 +143,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self._is_fitted = True
 
         # Set which layer transform function points to
-        if self.transform_layer is None:
+        if self.transform_layer_index is None:
                   self._transform_layer_index = len(self.hidden_units)
         else:
             self._transform_layer_index = self.transform_layer_index
