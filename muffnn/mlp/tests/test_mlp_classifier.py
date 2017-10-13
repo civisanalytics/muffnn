@@ -309,4 +309,4 @@ def test_embedding():
     clf = MLPClassifier(n_epochs=1)
     clf.fit(X, y)
 
-    assert clf._compute_embedding(X).shape[1] == 256
+    assert clf.transform(X).shape[1] == 256

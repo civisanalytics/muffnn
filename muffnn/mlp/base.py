@@ -123,6 +123,12 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self.is_sparse_ = sp.issparse(X)
             self.input_layer_sz_ = X.shape[1]
 
+            # Set which layer transform function points to
+            if self.transform_layer_index is None:
+                self._transform_layer_index = len(self.hidden_units)
+            else:
+                self._transform_layer_index = self.transform_layer_index
+
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
             # set a graph to be treated as the default graph.
@@ -142,11 +148,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
 
-        # Set which layer transform function points to
-        if self.transform_layer_index is None:
-                  self._transform_layer_index = len(self.hidden_units)
-        else:
-            self._transform_layer_index = self.transform_layer_index
 
 
         # Train the model with the given data.
@@ -260,14 +261,18 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     t = tf.nn.dropout(t, keep_prob=self._keep_prob)
                 t = affine(t, layer_sz, scope='layer_%d' % i)
 
-            if self._transform_layer_index == i:
-                self.transform_layer_ = t
-
             t = t if self.activation is None else self.activation(t)
+
+            # Set transformed layer to hidden layer
+            if self._transform_layer_index == i:
+                self._transform_layer = t
 
         # The output layer and objective function depend on the model
         # (e.g., classification vs regression).
         t = self._init_model_output(t)
+        if self._transform_layer_index == 0:
+            self._transform_layer = t
+
         self._init_model_objective_fn(t)
 
         self._train_step = self.solver(
@@ -362,7 +367,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             X = X.todense().A
 
         # Make predictions in batches.
-        pred_batches = []
+        embed_batches = []
         start_idx = 0
         n_examples = X.shape[0]
         with self.graph_.as_default():
@@ -372,7 +377,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 feed_dict = self._make_feed_dict(X_batch)
                 start_idx += self.batch_size
                 embed_batches.append(
-                    self._session.run(self.transform_layer_, feed_dict=feed_dict))
+                    self._session.run(self._transform_layer, feed_dict=feed_dict))
         embedding = np.concatenate(embed_batches)
         return embedding
 
