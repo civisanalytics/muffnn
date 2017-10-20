@@ -97,6 +97,7 @@ def test_partial_fit():
 def test_embedding_default():
     # Make sure the embedding works by default.
     data = load_diabetes()
+    X, y = data['data'], data['target']
 
     clf = MLPRegressor(n_epochs=1)
     clf.fit(X, y)
@@ -107,6 +108,7 @@ def test_embedding_default():
 def test_embedding_no_layers():
     # Make sure the embedding works with no layers.
     data = load_diabetes()
+    X, y = data['data'], data['target']
 
     clf = MLPRegressor(n_epochs=1, hidden_units=None)
     clf.fit(X, y)
@@ -117,6 +119,7 @@ def test_embedding_no_layers():
 def test_embedding_specific_layer():
     # Make sure the embedding works with no layers.
     data = load_diabetes()
+    X, y = data['data'], data['target']
 
     clf = MLPRegressor(
         n_epochs=1,
