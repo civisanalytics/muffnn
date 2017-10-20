@@ -315,7 +315,7 @@ def test_embedding_no_layers():
     # Make sure the embedding works with no layers.
     X, y = iris.data, iris.target
 
-    clf = MLPClassifier(n_epochs=1, hidden_units=None)
+    clf = MLPClassifier(n_epochs=1, hidden_units=[])
     clf.fit(X, y)
 
     assert clf.transform(X).shape[1] == np.unique(y).shape[0]

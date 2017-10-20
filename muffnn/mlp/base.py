@@ -383,6 +383,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 embed_batches.append(self._session.run(
                     self._transform_layer, feed_dict=feed_dict))
         embedding = np.concatenate(embed_batches)
+        if embedding.ndim == 1:
+            embedding = embedding.reshape(-1, 1)
         return embedding
 
     def fit_transform(self, X, y=None, **fit_params):

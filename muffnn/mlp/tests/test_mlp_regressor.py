@@ -110,10 +110,10 @@ def test_embedding_no_layers():
     data = load_diabetes()
     X, y = data['data'], data['target']
 
-    clf = MLPRegressor(n_epochs=1, hidden_units=None)
+    clf = MLPRegressor(n_epochs=1, hidden_units=[])
     clf.fit(X, y)
 
-    assert clf.transform(X).shape[1] == np.unique(y).shape[0]
+    assert clf.transform(X).shape[1] == 1
 
 
 def test_embedding_specific_layer():
