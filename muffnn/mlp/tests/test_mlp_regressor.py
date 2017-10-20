@@ -94,13 +94,34 @@ def test_partial_fit():
     assert pearsonr(y_pred, y)[0] > 0.5
 
 
-def test_embedding():
-    # Check that fitting twice works (e.g., to make sure that fit-related
-    # variables are cleared appropriately when refitting).
-
-    X, y = iris.data, iris.target
+def test_embedding_default():
+    # Make sure the embedding works by default.
+    data = load_diabetes()
 
     clf = MLPRegressor(n_epochs=1)
     clf.fit(X, y)
 
-    assert clf._compute_embedding(X).shape[1] == 256
+    assert clf.transform(X).shape[1] == 256
+
+
+def test_embedding_no_layers():
+    # Make sure the embedding works with no layers.
+    data = load_diabetes()
+
+    clf = MLPRegressor(n_epochs=1, hidden_units=None)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == np.unique(y).shape[0]
+
+
+def test_embedding_specific_layer():
+    # Make sure the embedding works with no layers.
+    data = load_diabetes()
+
+    clf = MLPRegressor(
+        n_epochs=1,
+        hidden_units=(256, 8, 256),
+        transform_layer_index=1)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == 8

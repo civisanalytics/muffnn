@@ -300,13 +300,35 @@ def test_cross_val_predict():
 
     assert np.all(auc >= 0.96)
 
-def test_embedding():
-    # Check that fitting twice works (e.g., to make sure that fit-related
-    # variables are cleared appropriately when refitting).
 
+def test_embedding_default():
+    # Make sure the embedding works by default.
     X, y = iris.data, iris.target
 
     clf = MLPClassifier(n_epochs=1)
     clf.fit(X, y)
 
     assert clf.transform(X).shape[1] == 256
+
+
+def test_embedding_no_layers():
+    # Make sure the embedding works with no layers.
+    X, y = iris.data, iris.target
+
+    clf = MLPClassifier(n_epochs=1, hidden_units=None)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == np.unique(y).shape[0]
+
+
+def test_embedding_specific_layer():
+    # Make sure the embedding works with no layers.
+    X, y = iris.data, iris.target
+
+    clf = MLPClassifier(
+        n_epochs=1,
+        hidden_units=(256, 8, 256),
+        transform_layer_index=1)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == 8

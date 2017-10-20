@@ -124,7 +124,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self.input_layer_sz_ = X.shape[1]
 
             # Set which layer transform function points to
-            if self.transform_layer_index is None:
+            if (self.transform_layer_index is None and
+                    self.hidden_units is not None):
                 self._transform_layer_index = len(self.hidden_units) - 1
             else:
                 self._transform_layer_index = self.transform_layer_index
@@ -147,8 +148,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
 
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
-
-
 
         # Train the model with the given data.
         with self.graph_.as_default():
@@ -208,7 +207,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                           random_state=self.random_state,
                           n_epochs=self.n_epochs,
                           solver=self.solver,
-                          solver_kwargs=self.solver_kwargs
+                          solver_kwargs=self.solver_kwargs,
+                          transform_layer_index=self.transform_layer_index
                           ))
 
         # Add fitted attributes if the model has been fitted.
@@ -216,6 +216,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             state['input_layer_sz_'] = self.input_layer_sz_
             state['is_sparse_'] = self.is_sparse_
             state['_random_state'] = self._random_state
+            state['_transform_layer_index'] = self._transform_layer_index
 
         return state
 
@@ -270,7 +271,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         # The output layer and objective function depend on the model
         # (e.g., classification vs regression).
         t = self._init_model_output(t)
-        if self._transform_layer_index == 0:
+
+        # set the transform layer to the output logits if it is not set
+        # already.
+        if not hasattr(self, '_transform_layer'):
             self._transform_layer = t
 
         self._init_model_objective_fn(t)
@@ -340,21 +344,21 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
     def predict(self, X):
         pass
 
-    def transform(self, X):
-        """Transforms input into hidden layer of users choice
+    def transform(self, X, y=None):
+        """Transforms input into hidden layer outputs of users choice.
 
         Parameters
         ----------
-        X : sparse matrix
+        X : {array-like, sparse matrix}, shape = (n_samples, n_features)
+            Examples to make predictions about.
 
         Returns
         -------
-        np.array : numpy array with shape (len(X), hiden_units )
-                  embedding layer
+        X_new : numpy array of shape [n_samples, n_features_new]
+            Transformed array.
         """
-
         if not self._is_fitted:
-            raise NotFittedError("Call fit before prediction")
+            raise NotFittedError("Call fit before transform")
 
         X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])
 
@@ -376,10 +380,37 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     X[start_idx:min(start_idx + self.batch_size, n_examples)]
                 feed_dict = self._make_feed_dict(X_batch)
                 start_idx += self.batch_size
-                embed_batches.append(
-                    self._session.run(self._transform_layer, feed_dict=feed_dict))
+                embed_batches.append(self._session.run(
+                    self._transform_layer, feed_dict=feed_dict))
         embedding = np.concatenate(embed_batches)
         return embedding
+
+    def fit_transform(self, X, y=None, **fit_params):
+            """Fit to data, then transform it.
+
+            Fits transformer to X and y with optional parameters fit_params
+            and returns a transformed version of X.
+
+            Parameters
+            ----------
+            X : numpy array of shape [n_samples, n_features]
+                Training set.
+            y : numpy array of shape [n_samples]
+                Target values.
+            Returns
+            -------
+            X_new : numpy array of shape [n_samples, n_features_new]
+                Transformed array.
+            """
+            # non-optimized default implementation; override when a better
+            # method is possible for a given clustering algorithm
+            if y is None:
+                # fit method of arity 1 (unsupervised transformation)
+                return self.fit(X, **fit_params).transform(X)
+            else:
+                # fit method of arity 2 (supervised transformation)
+                return self.fit(X, y, **fit_params).transform(X)
+
 
 def _sparse_matrix_data(X):
     """Prepare the sparse matrix for conversion to TensorFlow.

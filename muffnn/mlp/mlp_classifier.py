@@ -59,6 +59,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         Additional keyword arguments to pass to `solver` upon construction.
         See the TensorFlow documentation for possible options. Typically,
         one would want to set the `learning_rate`.
+    transform_layer_index : int, optional
+        The index of the hidden layer to use to transform inputs. If not given,
+        it defaults to the last hidden layer or output logits in the case that
+        no hidden layers are used.
 
     Attributes
     ----------
