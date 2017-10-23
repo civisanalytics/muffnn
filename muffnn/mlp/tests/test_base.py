@@ -4,6 +4,7 @@ from __future__ import division
 from io import BytesIO
 import pickle
 
+import pytest
 import six
 import numpy as np
 import scipy.sparse
@@ -29,7 +30,8 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1,
                  random_state=None, monitor=None,
-                 solver=tf.train.AdamOptimizer, solver_kwargs=None):
+                 solver=tf.train.AdamOptimizer, solver_kwargs=None,
+                 transform_layer_index=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -40,6 +42,7 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
         self.monitor = monitor
         self.solver = solver
         self.solver_kwargs = solver_kwargs
+        self.transform_layer_index = transform_layer_index
 
     def _init_model_output(self, t):
         self.input_targets_ = tf.placeholder(tf.int64, [None], "targets")
@@ -184,3 +187,19 @@ def test_partial_fit_random_state():
                          in mock_make_feed_dict.call_args_list}
 
     assert unique_orderings == unique_orderings2
+
+
+def test_transform_layer_index_out_of_range():
+    """Ensure the base class raises a ValueError if the transform_layer_index
+    is out of range"""
+
+    y = np.arange(50)
+    X = np.expand_dims(y, 1)
+
+    with pytest.raises(ValueError):
+        clf = SimpleTestEstimator(transform_layer_index=-2, hidden_units=[])
+        clf.partial_fit(X, y)
+
+    with pytest.raises(ValueError):
+        clf = SimpleTestEstimator(transform_layer_index=1, hidden_units=[256])
+        clf.partial_fit(X, y)

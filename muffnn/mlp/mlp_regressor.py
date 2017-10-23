@@ -58,6 +58,10 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         Additional keyword arguments to pass to `solver` upon construction.
         See the TensorFlow documentation for possible options. Typically,
         one would want to set the `learning_rate`.
+    transform_layer_index : int, optional
+        The index of the hidden layer to use to transform inputs. If not given,
+        it defaults to the last hidden layer or output logits in the case that
+        no hidden layers are used.
 
     Attributes
     ----------
@@ -85,7 +89,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  keep_prob=1.0, activation=nn.relu, init_scale=0.1,
                  random_state=None, solver=tf.train.AdamOptimizer,
-                 solver_kwargs=None):
+                 solver_kwargs=None, transform_layer_index=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -95,6 +99,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         self.random_state = random_state
         self.solver = solver
         self.solver_kwargs = solver_kwargs
+        self.transform_layer_index = transform_layer_index
 
     def _init_model_output(self, t):
         if self.is_sparse_ and not self.hidden_units:

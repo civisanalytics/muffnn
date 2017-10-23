@@ -92,3 +92,39 @@ def test_partial_fit():
 
     y_pred = clf.predict(X)
     assert pearsonr(y_pred, y)[0] > 0.5
+
+
+def test_embedding_default():
+    # Make sure the embedding works by default.
+    data = load_diabetes()
+    X, y = data['data'], data['target']
+
+    clf = MLPRegressor(n_epochs=1)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == 256
+
+
+def test_embedding_no_layers():
+    # Make sure the embedding works with no layers.
+    data = load_diabetes()
+    X, y = data['data'], data['target']
+
+    clf = MLPRegressor(n_epochs=1, hidden_units=[])
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == 1
+
+
+def test_embedding_specific_layer():
+    # Make sure the embedding works with no layers.
+    data = load_diabetes()
+    X, y = data['data'], data['target']
+
+    clf = MLPRegressor(
+        n_epochs=1,
+        hidden_units=(256, 8, 256),
+        transform_layer_index=1)
+    clf.fit(X, y)
+
+    assert clf.transform(X).shape[1] == 8
