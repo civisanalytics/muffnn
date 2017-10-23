@@ -4,6 +4,7 @@ from __future__ import division
 from io import BytesIO
 import pickle
 
+import pytest
 import six
 import numpy as np
 import scipy.sparse
@@ -186,3 +187,19 @@ def test_partial_fit_random_state():
                          in mock_make_feed_dict.call_args_list}
 
     assert unique_orderings == unique_orderings2
+
+
+def test_transform_layer_index_out_of_range():
+    """Ensure the base class raises a ValueError if the transform_layer_index
+    is out of range"""
+
+    y = np.arange(50)
+    X = np.expand_dims(y, 1)
+
+    with pytest.raises(ValueError):
+        clf = SimpleTestEstimator(transform_layer_index=-2, hidden_units=[])
+        clf.partial_fit(X, y)
+
+    with pytest.raises(ValueError):
+        clf = SimpleTestEstimator(transform_layer_index=1, hidden_units=[256])
+        clf.partial_fit(X, y)

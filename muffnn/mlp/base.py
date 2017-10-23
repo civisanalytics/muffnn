@@ -124,11 +124,16 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self.input_layer_sz_ = X.shape[1]
 
             # Set which layer transform function points to
-            if (self.transform_layer_index is None and
-                    self.hidden_units is not None):
+            if self.transform_layer_index is None:
                 self._transform_layer_index = len(self.hidden_units) - 1
             else:
                 self._transform_layer_index = self.transform_layer_index
+
+            if (self._transform_layer_index < -1 or
+                    self._transform_layer_index >= len(self.hidden_units)):
+                raise ValueError(
+                    "`transform_layer_index` must be in the range "
+                    "[-1, len(hidden_units)-1]!")
 
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
@@ -272,9 +277,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         # (e.g., classification vs regression).
         t = self._init_model_output(t)
 
-        # set the transform layer to the output logits if it is not set
-        # already.
-        if not hasattr(self, '_transform_layer'):
+        # set the transform layer to output logits if we have no hidden layers
+        if self._transform_layer_index == -1:
             self._transform_layer = t
 
         self._init_model_objective_fn(t)
