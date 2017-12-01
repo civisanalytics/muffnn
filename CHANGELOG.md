@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.0.0] - unreleased
+
+### Changed
+
+- Moved the MLPClassifier and MLPRegressor to using
+  [Xavier initialization](https://www.tensorflow.org/api_docs/python/tf/contrib/layers/xavier_initializer) (#68). 
+
 ## [1.2.0] - 2017-09-21
 
 ### Added
