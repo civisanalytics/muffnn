@@ -144,7 +144,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     self._random_state.randint(0, 10000000))
 
                 tf.get_variable_scope().set_initializer(
-                    tf.uniform_unit_scaling_initializer(self.init_scale))
+                    tf.contrib.layers.xavier_initializer())
 
                 self._build_tf_graph()
 
@@ -208,7 +208,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                           batch_size=self.batch_size,
                           keep_prob=self.keep_prob,
                           hidden_units=self.hidden_units,
-                          init_scale=self.init_scale,
                           random_state=self.random_state,
                           n_epochs=self.n_epochs,
                           solver=self.solver,
