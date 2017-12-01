@@ -45,11 +45,11 @@ def check_predictions(est, X, y):
 # the toy example tests that have only a handful of examples.
 class MLPRegressorManyEpochs(MLPRegressor):
     def __init__(self, hidden_units=(256,), batch_size=64,
-                 keep_prob=1.0, activation=nn.relu, init_scale=0.1):
+                 keep_prob=1.0, activation=nn.relu):
         super(MLPRegressorManyEpochs, self).__init__(
             hidden_units=hidden_units, batch_size=batch_size,
             n_epochs=100, keep_prob=keep_prob,
-            activation=activation, init_scale=init_scale,
+            activation=activation,
             random_state=42)
 
 
