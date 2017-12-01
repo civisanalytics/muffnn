@@ -43,11 +43,6 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         <https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dropout>`
     activation : callable, optional
         The activation function.  See tensorflow.python.ops.nn.
-    init_scale : float, optional
-        The scale for the initialization function.  The TF default initializer,
-        `uniform_unit_scaling_initializer
-        <https://www.tensorflow.org/versions/r0.8/api_docs/python/state_ops.html#uniform_unit_scaling_initializer>`,
-        is used.
     random_state : int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
@@ -87,7 +82,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
     """
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
-                 keep_prob=1.0, activation=nn.relu, init_scale=0.1,
+                 keep_prob=1.0, activation=nn.relu,
                  random_state=None, solver=tf.train.AdamOptimizer,
                  solver_kwargs=None, transform_layer_index=None):
         self.hidden_units = hidden_units
@@ -95,7 +90,6 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         self.n_epochs = n_epochs
         self.keep_prob = keep_prob
         self.activation = activation
-        self.init_scale = init_scale
         self.random_state = random_state
         self.solver = solver
         self.solver_kwargs = solver_kwargs

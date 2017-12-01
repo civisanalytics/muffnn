@@ -28,7 +28,7 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
     _keep_prob = 1.0
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
-                 keep_prob=1.0, activation=nn.relu, init_scale=0.1,
+                 keep_prob=1.0, activation=nn.relu,
                  random_state=None, monitor=None,
                  solver=tf.train.AdamOptimizer, solver_kwargs=None,
                  transform_layer_index=None):
@@ -37,7 +37,6 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
         self.n_epochs = n_epochs
         self.keep_prob = keep_prob
         self.activation = activation
-        self.init_scale = init_scale
         self.random_state = random_state
         self.monitor = monitor
         self.solver = solver
