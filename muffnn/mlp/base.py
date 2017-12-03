@@ -156,12 +156,13 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
 
         # Train the model with the given data.
         with self.graph_.as_default():
-            n_examples = X.shape[0]
-            indices = np.arange(n_examples)
+            # Initialize dataset iterator
+            self._session.run(self.iterator.initializer, feed_dict={self._features_placeholder: X, self._labels_placeholder: y})
 
             for epoch in range(self.n_epochs):
-                self._random_state.shuffle(indices)
+                # self._random_state.shuffle(indices)
                 for start_idx in range(0, n_examples, self.batch_size):
+
                     batch_ind = indices[start_idx:start_idx + self.batch_size]
                     feed_dict = self._make_feed_dict(X[batch_ind],
                                                      y[batch_ind])
@@ -198,6 +199,48 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                  DataConversionWarning, stacklevel=2)
             y = y[:, 0]
         return X, y
+
+    def _build_pipeline(self, X, y):
+        """
+
+        Parameters
+        ----------
+        X : numpy array
+        y : numpy array
+
+        Returns
+        -------
+
+        """
+
+        if self.is_sparse_:
+            indices, values = _sparse_matrix_data(X)
+
+            feed_dict = {
+                self._input_indices: indices,
+                self._input_values: values,
+                self._input_shape: X.shape
+            }
+
+        else:
+
+
+
+
+        if y is None:
+            # If y is None, then we are doing prediction and should fix
+            # dropout.
+            feed_dict[self._keep_prob] = 1.0
+        else:
+            # TODO: why is underscore after
+            self.input_targets_] = y
+            feed_dict[self._keep_prob] = self.keep_prob
+
+        self._input_values = tf.placeholder(X.dtype, X.shape)
+        self.input_targets_   = tf.placeholder(y.dtype, y.shape)
+
+        self.iterator = dataset.make_initializable_iterator()
+
 
     def __getstate__(self):
         # Handles TF persistence
@@ -247,13 +290,21 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 tf.placeholder(np.float32, [None], "input_values")
             self._input_shape = \
                 tf.placeholder(np.int64, [2], "input_shape")
+
+            # TODO: understand how to construct pipeline for sparse data
+
+
+
             # t will be the current layer as we build up the graph below.
             t = tf.SparseTensor(self._input_indices, self._input_values,
                                 self._input_shape)
         else:
-            self._input_values = \
-                tf.placeholder(np.float32, [None, self.input_layer_sz_],
-                               "input_values")
+            self._features_placeholder = tf.placeholder(np.float32, [None, self.input_layer_sz_], "input_values")
+
+
+            dataset = tf.data.Dataset.from_tensor_slices((self._features_placeholder, self._labels_placeholder))
+            dataset = dataset.shuffle(10000).batch(self.batch_size)
+
             t = self._input_values
 
         # Hidden layers.
@@ -307,6 +358,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             # dropout.
             feed_dict[self._keep_prob] = 1.0
         else:
+            # TODO: why is underscore after
             feed_dict[self.input_targets_] = y
             feed_dict[self._keep_prob] = self.keep_prob
 

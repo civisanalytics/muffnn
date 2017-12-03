@@ -111,6 +111,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, output_size, scope='output_layer')
 
+
+        # TODO: discuss where to move the instantiaion of self.input_targets_
+        # TODO: it need to be moved or the init_model_output needs to take an addition input
+
         if self.multilabel_:
             self.input_targets_ = \
                 tf.placeholder(tf.int64, [None, self.n_classes_], "targets")
