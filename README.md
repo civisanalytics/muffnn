@@ -1,9 +1,6 @@
-# Introduction
+# muffnn
 
-This project provides multilayer perceptron predictive models, implemented
-using [TensorFlow](https://www.tensorflow.org/) and following the
-[scikit-learn](http://scikit-learn.org)
-[Predictor API](http://scikit-learn.org/stable/developers/contributing.html#apis-of-scikit-learn-objects).
+[scikit-learn](http://scikit-learn.org)-compatible neural network models in implemented in [TensorFlow](https://www.tensorflow.org/)
 
 # Installation
 
@@ -29,8 +26,7 @@ pip install -r dev-requirements.txt
 
 # Usage
 
-To use the code, import one of the predictor classes and use it as you would
-other predictors such as `LogisticRegression`. An example:
+Each estimator in the code follows the scikit-learn API. Thus usage follows the scikit-learn conventions:
 
 ```python
 from muffnn import MLPClassifier
@@ -44,6 +40,15 @@ X_new = load_some_unlabeled_data()
 y_pred = mlp.predict(X_new)
 ```
 
+Further, serialization of the TensorFlow graph and data is handled automatically when the object is pickled:
+
+```python
+import pickle
+
+with open('est.pkl', 'wb') as fp:
+    pickle.dump(est, fp)
+```
+
 # Contributing
 
 See `CONTIBUTING.md` for information about contributing to this project.
@@ -53,17 +58,3 @@ See `CONTIBUTING.md` for information about contributing to this project.
 BSD-3
 
 See `LICENSE.txt` for details.
-
-# Related Tools
-
-* [sklearn.neural_network](http://scikit-learn.org/dev/modules/classes.html#module-sklearn.neural_network)
-* [tensorflow.contrib.learn](https://github.com/tensorflow/tensorflow/tree/r0.10/tensorflow/contrib/learn/python/learn)
-* [keras.wrappers.scikit_learn](https://keras.io/scikit-learn-api/)
-
-# Contributors
-
-* [Mike Heilman](https://github.com/mheilman/)
-* [Walt Askew](https://github.com/waltaskew/)
-* [Matt Becker](https://github.com/beckermr/)
-* [Bill Lattner](https://github.com/wlattner/)
-* [Sam Weiss](https://github.com/samcarlos)
