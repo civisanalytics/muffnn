@@ -138,6 +138,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             # Instantiate the graph.  TensorFlow seems easier to use by just
             # adding to the default graph, and as_default lets you temporarily
             # set a graph to be treated as the default graph.
+            # TODO: why is graph_.as_default being called, isn't there just one graph?
             self.graph_ = Graph()
             with self.graph_.as_default():
                 tf_random_seed.set_random_seed(
@@ -157,30 +158,31 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         # Train the model with the given data.
         with self.graph_.as_default():
             # Initialize dataset iterator
-            self._session.run(self.iterator.initializer, feed_dict={self._features_placeholder: X, self._labels_placeholder: y})
+            # TODO: should this be in the with clause above
 
-            for epoch in range(self.n_epochs):
-                # self._random_state.shuffle(indices)
-                for start_idx in range(0, n_examples, self.batch_size):
+            self._session.run(self.iterator.initializer,
+                              feed_dict={self._features_placeholder: X,
+                                         self._labels_placeholder: y})
 
-                    batch_ind = indices[start_idx:start_idx + self.batch_size]
-                    feed_dict = self._make_feed_dict(X[batch_ind],
-                                                     y[batch_ind])
-                    obj_val, _ = self._session.run(
-                        [self._obj_func, self._train_step],
-                        feed_dict=feed_dict)
-                    _LOGGER.debug("objective: %.4f, epoch: %d, idx: %d",
-                                  obj_val, epoch, start_idx)
+            while True:
+                try:
+                    # TODO: add a global step variable
+                    # Taining step
+                    obj_val, _ = self._session.run([self._obj_func, self._train_step])
 
-                _LOGGER.info("objective: %.4f, epoch: %d, idx: %d",
-                             obj_val, epoch, start_idx)
+                    # TODO: reduce the number of saved values, this should be replaced with a summary writer
+                    _LOGGER.debug("objective: %.4f, epoch: %d, idx: %d", obj_val)
 
-                if monitor:
-                    stop_early = monitor(epoch, self, {'loss': obj_val})
-                    if stop_early:
-                        _LOGGER.info(
-                            "stopping early due to monitor function.")
-                        return self
+                    # TODO: figure out how to catch end of epoch to keep this
+                    if monitor:
+                        # TODO what is monitor
+                        stop_early = monitor(epoch, self, {'loss': obj_val})
+                        if stop_early:
+                            _LOGGER.info(
+                                "stopping early due to monitor function.")
+                            return self
+                except tf.errors.OutOfRangeError:
+                    break
 
         return self
 
@@ -199,48 +201,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                  DataConversionWarning, stacklevel=2)
             y = y[:, 0]
         return X, y
-
-    def _build_pipeline(self, X, y):
-        """
-
-        Parameters
-        ----------
-        X : numpy array
-        y : numpy array
-
-        Returns
-        -------
-
-        """
-
-        if self.is_sparse_:
-            indices, values = _sparse_matrix_data(X)
-
-            feed_dict = {
-                self._input_indices: indices,
-                self._input_values: values,
-                self._input_shape: X.shape
-            }
-
-        else:
-
-
-
-
-        if y is None:
-            # If y is None, then we are doing prediction and should fix
-            # dropout.
-            feed_dict[self._keep_prob] = 1.0
-        else:
-            # TODO: why is underscore after
-            self.input_targets_] = y
-            feed_dict[self._keep_prob] = self.keep_prob
-
-        self._input_values = tf.placeholder(X.dtype, X.shape)
-        self.input_targets_   = tf.placeholder(y.dtype, y.shape)
-
-        self.iterator = dataset.make_initializable_iterator()
-
 
     def __getstate__(self):
         # Handles TF persistence
@@ -291,21 +251,38 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self._input_shape = \
                 tf.placeholder(np.int64, [2], "input_shape")
 
-            # TODO: understand how to construct pipeline for sparse data
+            # TODO: understand how to construct a pipeline for sparse data
+            sparse_dataset = tf.data.Dataset.from_tensor_slices((self._input_indices, self._input_values, self._input_shape ))
+            # TODO: it may be possible to use map
+            sparse_dataset = sparse_dataset.map(lambda x: tf.SparseTensor(*x))
+            labels_dataset = tf.data.Dataset.from_tensor_slices((self._labels_placeholder))
 
+            dataset = tf.data.Dataset.zip((sparse_dataset, labels_dataset))
+            dataset = dataset.shuffle(10000).batch(self.batch_size).repeat(self.n_epochs)
 
+            iterator = dataset.make_initializable_iterator()
+
+            # TODO: pray the following is not what we have to do
+            (x, y, z), self._input_targets = iterator.get_next()
 
             # t will be the current layer as we build up the graph below.
-            t = tf.SparseTensor(self._input_indices, self._input_values,
-                                self._input_shape)
+            t = tf.SparseTensor(x, y, x)
+            # TODO: if map works
+            self._input_values, self._input_targets = iterator.get_next()
+
         else:
-            self._features_placeholder = tf.placeholder(np.float32, [None, self.input_layer_sz_], "input_values")
+            self._input_placeholder = tf.placeholder(np.float32, [None, self.input_layer_sz_], "input_values")
+            # TODO: see mlp_classifier for TODO on self._labels_placeholders
 
+            dataset = tf.data.Dataset.from_tensor_slices((self._input_placeholder, self._labels_placeholder))
+            dataset = dataset.shuffle(10000).batch(self.batch_size).repeat(self.n_epochs)
 
-            dataset = tf.data.Dataset.from_tensor_slices((self._features_placeholder, self._labels_placeholder))
-            dataset = dataset.shuffle(10000).batch(self.batch_size)
+            iterator = dataset.make_initializable_iterator()
 
-            t = self._input_values
+            self._input_values, self._input_targets = iterator.get_next()
+
+        # Set first layer inputs
+        t = self._input_values
 
         # Hidden layers.
         for i, layer_sz in enumerate(self.hidden_units):
@@ -337,32 +314,6 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             **self.solver_kwargs if self.solver_kwargs else {}).minimize(
             self._obj_func)
 
-    def _make_feed_dict(self, X, y=None):
-        # Make the dictionary mapping tensor placeholders to input data.
-
-        if self.is_sparse_:
-            indices, values = _sparse_matrix_data(X)
-
-            feed_dict = {
-                self._input_indices: indices,
-                self._input_values: values,
-                self._input_shape: X.shape
-            }
-        else:
-            feed_dict = {
-                self._input_values: X
-            }
-
-        if y is None:
-            # If y is None, then we are doing prediction and should fix
-            # dropout.
-            feed_dict[self._keep_prob] = 1.0
-        else:
-            # TODO: why is underscore after
-            feed_dict[self.input_targets_] = y
-            feed_dict[self._keep_prob] = self.keep_prob
-
-        return feed_dict
 
     def _compute_output(self, X):
         """Get the outputs of the network, for use in prediction methods."""

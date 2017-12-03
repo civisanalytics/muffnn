@@ -328,6 +328,7 @@ class TFPicklingBase(object):
         """
         self._set_up_graph()
         self._saver = tf.train.Saver()
+        # TODO: presonally thing session calls should be within with clauses
         self._session = tf.Session()
 
     @abstractmethod
