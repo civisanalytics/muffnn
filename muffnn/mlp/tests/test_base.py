@@ -23,6 +23,7 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
 
     _input_indices = 'input_indices'
     _input_values = 'input_values'
+    _sample_weight = 'sample_weight'
     _input_shape = 'input_shape'
     input_targets_ = 'input_targets'
     _keep_prob = 1.0

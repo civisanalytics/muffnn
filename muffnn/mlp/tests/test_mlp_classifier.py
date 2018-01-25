@@ -14,7 +14,8 @@ import six
 import numpy as np
 import pytest
 import scipy.sparse as sp
-from sklearn.datasets import load_iris
+from sklearn.datasets import (load_iris, make_classification,
+                              make_multilabel_classification)
 from sklearn.linear_model.tests.test_logistic import check_predictions
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -26,6 +27,7 @@ from sklearn.model_selection import cross_val_predict, KFold
 from tensorflow import nn
 
 from muffnn import MLPClassifier
+from muffnn.mlp.tests.util import assert_sample_weights_work
 
 if six.PY2:
     from mock import MagicMock
@@ -159,6 +161,7 @@ def test_feed_dict():
     mlp._input_values = "input_values"
     mlp._input_shape = "input_shape"
     mlp._keep_prob = "t_keep_prob"
+    mlp._sample_weight = "sample_weight"
 
     # sparse, targets given for training
     mlp.is_sparse_ = True
@@ -169,14 +172,14 @@ def test_feed_dict():
     y = MagicMock()
     fd = mlp._make_feed_dict(X_sparse, y)
     expected_keys = {'input_shape', 'input_values', 'input_indices',
-                     'input_targets', 't_keep_prob'}
+                     'input_targets', 't_keep_prob', 'sample_weight'}
     assert set(fd.keys()) == expected_keys
     assert fd['t_keep_prob'] == 0.5
 
     # sparse, no targets given
     fd = mlp._make_feed_dict(X_sparse)
     expected_keys = {'input_shape', 'input_values', 'input_indices',
-                     't_keep_prob'}
+                     't_keep_prob', 'sample_weight'}
     assert set(fd.keys()) == expected_keys
     assert fd['t_keep_prob'] == 1.0
 
@@ -184,13 +187,14 @@ def test_feed_dict():
     mlp.is_sparse_ = False
     X_dense = MagicMock()
     fd = mlp._make_feed_dict(X_dense, y)
-    expected_keys = {'input_values', 't_keep_prob', 'input_targets'}
+    expected_keys = {'input_values', 't_keep_prob', 'input_targets',
+                     'sample_weight'}
     assert set(fd.keys()) == expected_keys
     assert fd['t_keep_prob'] == 0.5
 
     # dense, no targets given
     fd = mlp._make_feed_dict(X_dense)
-    expected_keys = {'input_values', 't_keep_prob'}
+    expected_keys = {'input_values', 't_keep_prob', 'sample_weight'}
     assert set(fd.keys()) == expected_keys
     assert fd['t_keep_prob'] == 1.0
 
@@ -332,3 +336,24 @@ def test_embedding_specific_layer():
     clf.fit(X, y)
 
     assert clf.transform(X).shape[1] == 8
+
+
+@pytest.mark.parametrize("make_dataset_func,dataset_kwargs", [
+    (make_classification, {'n_samples': 3000,
+                           'n_classes': 2,
+                           'class_sep': 2.0}),
+    (make_classification, {'n_samples': 3000,
+                           'n_classes': 3,
+                           'class_sep': 2.0,
+                           'n_informative': 6}),
+    (make_multilabel_classification, {'n_samples': 3000,
+                                      'n_classes': 3}),
+])
+def test_sample_weight(make_dataset_func, dataset_kwargs):
+    """Ensure we handle sample weights for all classification problems."""
+    assert_sample_weights_work(
+        make_dataset_func,
+        dataset_kwargs,
+        lambda: MLPClassifier(n_epochs=30, random_state=42,
+                              keep_prob=0.8, hidden_units=(128,))
+    )

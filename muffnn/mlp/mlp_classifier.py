@@ -126,22 +126,39 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         return t
 
     def _init_model_objective_fn(self, t):
+
+        def reduce_weighted_mean(loss, weights):
+            weighted = tf.multiply(loss, weights)
+            return tf.divide(tf.reduce_sum(weighted),
+                             tf.reduce_sum(weights))
+
         if self.multilabel_:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=t, labels=tf.cast(self.input_targets_, np.float32))
             y_finite = tf.equal(self.input_targets_, -1)
-            self._obj_func = tf.reduce_mean(
-                tf.where(y_finite, self._zeros, cross_entropy))
+
+            # reshape to broadcast multiplication along cross_entropy
+            sample_weight = tf.reshape(self._sample_weight, (-1, 1))
+
+            # tile so we calculate the correct weighted sum
+            sample_weight = tf.tile(sample_weight, (1, self.n_classes_))
+
+            self._obj_func = reduce_weighted_mean(
+                tf.where(y_finite, self._zeros, cross_entropy),
+                tf.where(y_finite, self._zeros, sample_weight))
         elif self.n_classes_ > 2:
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=t, labels=self.input_targets_)
-            self._obj_func = tf.reduce_mean(cross_entropy)
+            self._obj_func = reduce_weighted_mean(
+                cross_entropy, self._sample_weight)
         else:
             cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=t, labels=tf.cast(self.input_targets_, np.float32))
-            self._obj_func = tf.reduce_mean(cross_entropy)
+            self._obj_func = reduce_weighted_mean(
+                cross_entropy, self._sample_weight)
 
-    def partial_fit(self, X, y, monitor=None, classes=None):
+    def partial_fit(self, X, y,
+                    monitor=None, sample_weight=None, classes=None):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -163,6 +180,10 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             The monitor can be used for various things such as computing
             held-out estimates, early stopping, model introspection,
             and snapshoting.
+        sample_weight : numpy array of shape (n_samples,)
+            Per-sample weights. Re-scale the loss per sample.
+            Higher weights force the estimator to put more emphasis
+            on these samples.
 
         Returns
         -------
@@ -174,7 +195,8 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
         """
         return super(MLPClassifier, self).partial_fit(
-            X, y, monitor=monitor, classes=classes)
+            X, y,
+            monitor=monitor, sample_weight=sample_weight, classes=classes)
 
     def _is_multilabel(self, y):
         """

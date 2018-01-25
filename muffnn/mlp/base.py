@@ -48,7 +48,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         # fitting a classifier.
         return y
 
-    def fit(self, X, y, monitor=None):
+    def fit(self, X, y, monitor=None, sample_weight=None):
         """Fit the model.
 
         Parameters
@@ -66,6 +66,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             The monitor can be used for various things such as computing
             held-out estimates, early stopping, model introspection,
             and snapshoting.
+        sample_weight : numpy array of shape [n_samples,]
+            Per-sample weights. Re-scale the loss per sample.
+            Higher weights force the estimator to put more emphasis
+            on these samples.
 
         Returns
         -------
@@ -78,14 +82,16 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X, y, monitor=monitor)
+        return self.partial_fit(X, y,
+                                monitor=monitor,
+                                sample_weight=sample_weight)
 
     def _fit_targets(self, y):
         # This can be overwritten to set instance variables that pertain to the
         # targets (e.g., an array of class labels).
         pass
 
-    def partial_fit(self, X, y, monitor=None, **kwargs):
+    def partial_fit(self, X, y, monitor=None, sample_weight=None, **kwargs):
         """Fit the model on a batch of training data.
 
         Parameters
@@ -103,6 +109,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             The monitor can be used for various things such as computing
             held-out estimates, early stopping, model introspection,
             and snapshoting.
+        sample_weight : numpy array of shape [n_samples,]
+            Per-sample weights. Re-scale the loss per sample.
+            Higher weights force the estimator to put more emphasis
+            on these samples.
 
         Returns
         -------
@@ -111,6 +121,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
 
         X, y = self._check_inputs(X, y)
         assert self.batch_size > 0, "batch_size <= 0"
+
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, ensure_2d=False)
 
         # Initialize the model if it hasn't been already by a previous call.
         if self._is_fitted:
@@ -163,8 +176,16 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                 self._random_state.shuffle(indices)
                 for start_idx in range(0, n_examples, self.batch_size):
                     batch_ind = indices[start_idx:start_idx + self.batch_size]
-                    feed_dict = self._make_feed_dict(X[batch_ind],
-                                                     y[batch_ind])
+
+                    if sample_weight is None:
+                        batch_sample_weight = None
+                    else:
+                        batch_sample_weight = sample_weight[batch_ind]
+
+                    feed_dict = self._make_feed_dict(
+                        X[batch_ind],
+                        y[batch_ind],
+                        sample_weight=batch_sample_weight)
                     obj_val, _ = self._session.run(
                         [self._obj_func, self._train_step],
                         feed_dict=feed_dict)
@@ -280,13 +301,16 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         if self._transform_layer_index == -1:
             self._transform_layer = t
 
+        self._sample_weight = \
+            tf.placeholder(np.float32, [None], "sample_weight")
+
         self._init_model_objective_fn(t)
 
         self._train_step = self.solver(
             **self.solver_kwargs if self.solver_kwargs else {}).minimize(
             self._obj_func)
 
-    def _make_feed_dict(self, X, y=None):
+    def _make_feed_dict(self, X, y=None, sample_weight=None):
         # Make the dictionary mapping tensor placeholders to input data.
 
         if self.is_sparse_:
@@ -309,6 +333,11 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         else:
             feed_dict[self.input_targets_] = y
             feed_dict[self._keep_prob] = self.keep_prob
+
+        if sample_weight is None:
+            feed_dict[self._sample_weight] = np.ones(X.shape[0])
+        else:
+            feed_dict[self._sample_weight] = sample_weight
 
         return feed_dict
 

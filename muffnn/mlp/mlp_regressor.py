@@ -132,7 +132,11 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
             warn("No variance in regression targets.")
 
     def _init_model_objective_fn(self, t):
-        self._obj_func = tf.reduce_mean((self.input_targets_ - t) ** 2)
+        mse = (self.input_targets_ - t) ** 2
+        self._obj_func = tf.divide(
+            tf.reduce_sum(
+                tf.multiply(mse, self._sample_weight)),
+            tf.reduce_sum(self._sample_weight))
 
     def predict(self, X):
         """Make predictions for the given input.
