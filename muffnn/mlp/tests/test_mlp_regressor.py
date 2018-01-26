@@ -9,11 +9,12 @@ from sklearn.utils.testing import \
     assert_equal, assert_array_almost_equal
 import scipy.sparse as sp
 from scipy.stats import pearsonr
-from sklearn.datasets import load_diabetes
+from sklearn.datasets import (load_diabetes, make_regression)
 from sklearn.utils.estimator_checks import check_estimator
 from tensorflow import nn
 
 from muffnn import MLPRegressor
+from muffnn.mlp.tests.util import assert_sample_weights_work
 
 
 # The defaults kwargs don't work for tiny datasets like those in these tests.
@@ -39,6 +40,16 @@ def check_predictions(est, X, y):
     preds = est.fit(X, y).predict(X)
     assert_equal(preds.shape, (n_samples,))
     assert_array_almost_equal(preds, y, decimal=1)
+
+
+def test_sample_weight():
+    """Ensure we handle sample weights for regression problems."""
+    assert_sample_weights_work(
+        make_regression,
+        {'n_samples': 3000},
+        lambda: MLPRegressor(n_epochs=30, random_state=42,
+                             keep_prob=0.8, hidden_units=(128,))
+    )
 
 
 # Make a subclass that has its default number of epochs high enough not to fail
