@@ -7,11 +7,10 @@ def assert_sample_weights_work(make_dataset_func, dataset_kwargs,
                                make_classifier_func):
     """Ensure we handle sample weights for the given classifier.
 
-    Ensures sample weights are taking affect by training multiple
-    classifiers on different permutations of the same data with
-    sample weights balancing the differences and by ensuring that
-    when trying to learn two datasets simultaneously, the estimator
-    performs best on the dataset weighted most heavily.
+    First asserts that estimators trained with no sample weights are
+    equivalent to estimators trained with sample weights of all 1s.
+    Further asserts that when trying to learn two datasets simultaneously,
+    the estimator performs best on the dataset weighted most heavily.
 
     Parameters
     ----------
@@ -29,19 +28,6 @@ def assert_sample_weights_work(make_dataset_func, dataset_kwargs,
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.33, random_state=42)
 
-    rng = np.random.RandomState(42)
-
-    def assert_clfs_almost_equal(clf1, clf2):
-        """Test outputs are approximately equal."""
-        if hasattr(clf1, 'predict_proba'):
-            disagreement = (clf1.predict_proba(X_test) -
-                            clf2.predict_proba(X_test))
-            assert np.abs(disagreement).mean() < 0.05
-        else:
-            correlation, _ = pearsonr(clf1.predict(X_test),
-                                      clf2.predict(X_test))
-            assert correlation > .98
-
     # A classifier with no sample weights and a classifier with
     # sample weights of all 1 should be equivalent.
     sample_weight = np.ones(X_train.shape[0])
@@ -50,29 +36,14 @@ def assert_sample_weights_work(make_dataset_func, dataset_kwargs,
         X_train, y_train,
         sample_weight=sample_weight,
     )
-    assert_clfs_almost_equal(clf1, clf2)
-
-    # Fitting twice with half sample-weights should result
-    # in same classifier as fitting once with full weights.
-    sample_weight = rng.rand(X_train.shape[0])
-    clf1 = make_classifier_func().fit(X_train, y_train)
-    clf2 = (
-        make_classifier_func()
-        .partial_fit(X_train, y_train, sample_weight=sample_weight / 2)
-        .partial_fit(X_train, y_train, sample_weight=sample_weight / 2)
-    )
-    assert_clfs_almost_equal(clf1, clf2)
-
-    # Duplicated inputs should have the same result as increasing
-    # the sample weights to the same degree as the duplication.
-    ind = rng.randint(0, X_train.shape[0], X_train.shape[0])
-    sample_weight = np.bincount(ind, minlength=X_train.shape[0])
-
-    clf1 = make_classifier_func().fit(X_train[ind], y_train[ind])
-    clf1 = make_classifier_func().fit(
-        X_train, y_train, sample_weight=sample_weight
-    )
-    assert_clfs_almost_equal(clf1, clf2)
+    if hasattr(clf1, 'predict_proba'):
+        disagreement = (clf1.predict_proba(X_test) -
+                        clf2.predict_proba(X_test))
+        assert np.abs(disagreement).mean() < 0.01
+    else:
+        correlation, _ = pearsonr(clf1.predict(X_test),
+                                  clf2.predict(X_test))
+        assert correlation > .99
 
     # When trying to learn two different datasets at once, the
     # classifier should perform best on the dataset more heavily weighted.

@@ -137,10 +137,13 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                 logits=t, labels=tf.cast(self.input_targets_, np.float32))
             y_finite = tf.equal(self.input_targets_, -1)
 
-            # reshape to broadcast multiplication along cross_entropy
+            # reshape the weights of shape (batch_size,) to shape
+            # (batch_size, n_classes_) using ``tile`` to place the
+            # values from self._sample_weight into each column of the
+            # resulting matrix.
+            # This allows us to arrive at the correct divisor in the
+            # weighted mean calculation by summing the matrix.
             sample_weight = tf.reshape(self._sample_weight, (-1, 1))
-
-            # tile so we calculate the correct weighted sum
             sample_weight = tf.tile(sample_weight, (1, self.n_classes_))
 
             self._obj_func = reduce_weighted_mean(
@@ -184,6 +187,11 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
             Per-sample weights. Re-scale the loss per sample.
             Higher weights force the estimator to put more emphasis
             on these samples.
+            Sample weights are normalized per-batch. As the batch size
+            approaches the size of the dataset this is equivalent to
+            normalizing the sample weights once ahead of time, but this
+            does result in a slight alteration to the objective function
+            which could potentially lead to odd behavior in edge cases.
 
         Returns
         -------

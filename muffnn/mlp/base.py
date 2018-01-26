@@ -70,6 +70,11 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             Per-sample weights. Re-scale the loss per sample.
             Higher weights force the estimator to put more emphasis
             on these samples.
+            Sample weights are normalized per-batch. As the batch size
+            approaches the size of the dataset this is equivalent to
+            normalizing the sample weights once ahead of time, but this
+            does result in a slight alteration to the objective function
+            which could potentially lead to odd behavior in edge cases.
 
         Returns
         -------
@@ -113,6 +118,11 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             Per-sample weights. Re-scale the loss per sample.
             Higher weights force the estimator to put more emphasis
             on these samples.
+            Sample weights are normalized per-batch. As the batch size
+            approaches the size of the dataset this is equivalent to
+            normalizing the sample weights once ahead of time, but this
+            does result in a slight alteration to the objective function
+            which could potentially lead to odd behavior in edge cases.
 
         Returns
         -------
