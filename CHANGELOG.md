@@ -6,8 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### Added
+
 - Added support for the `sample_weight` keyword argument to the `fit`
-  method of MLPClassifier and MLPRegressor.
+  method of MLPClassifier and MLPRegressor (#75).
 
 
 ## [2.0.0] - 2018-01-17
