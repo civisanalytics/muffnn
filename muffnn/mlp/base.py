@@ -293,6 +293,9 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             if self._transform_layer_index == i:
                 self._transform_layer = t
 
+        self._snakes = \
+            tf.placeholder(np.float32, [None], 'snakes')
+
         # The output layer and objective function depend on the model
         # (e.g., classification vs regression).
         t = self._init_model_output(t)
