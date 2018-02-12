@@ -14,7 +14,7 @@ contributors are expected to adhere to the
 4. Create a feature branch (`git checkout -b my-new-feature`).
 5. Make your change. Don't forget tests.
 6. Make sure the test suite, including your new tests, passes
-   (`py.test muffnn && pyflakes`).
+   (`py.test muffnn && flake8`).
 7. Commit your changes (`git commit -am 'Add some feature'`).
 8. Push to the branch (`git push origin my-new-feature`).
 9. Create a new pull request.
@@ -24,7 +24,7 @@ contributors are expected to adhere to the
 
 - All pull requests must include test coverage. If you’re not sure how to test
   your changes, feel free to ask for help.
-- Contributions must conform to the guidelines encoded by `pyflakes`, based on
+- Contributions must conform to the guidelines encoded by `flake8`, based on
   PEP-8.
 - Don’t forget to add your change to the [CHANGELOG](CHANGELOG.md). See
   [Keep a CHANGELOG](http://keepachangelog.com/) for guidelines.
