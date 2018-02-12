@@ -9,7 +9,7 @@ contributors are expected to adhere to the
 ## Getting Started
 
 1. Fork it ( https://github.com/civisanalytics/muffnn/fork ).
-2. Install it, with the development dependencies.  See `README.md`.
+2. Install it, with the development dependencies.  See `README.rst`.
 3. Make sure you are able to run the test suite locally (`py.test muffnn`).
 4. Create a feature branch (`git checkout -b my-new-feature`).
 5. Make your change. Don't forget tests.
