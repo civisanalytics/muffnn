@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Added support for the `sample_weight` keyword argument to the `fit`
   method of MLPClassifier and MLPRegressor (#75).
 
+### Changed
+
+- Switched from requiring TensorFlow 1.x to 1.4.x because 1.5.0 was causing
+  Travis CI failures with Python 3.6 (#78).
 
 ## [2.0.0] - 2018-01-17
 
