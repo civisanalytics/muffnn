@@ -15,7 +15,7 @@ setup(
     url='https://github.com/civisanalytics/muffnn',
     description=('Multilayer Feed-Forward Neural Network (MuFFNN) models with '
                  'TensorFlow and scikit-learn'),
-    long_description=open(os.path.join(THIS_DIR, 'README.md')).read(),
+    long_description=open(os.path.join(THIS_DIR, 'README.rst')).read(),
     include_package_data=True,
     license="BSD-3",
     install_requires=['numpy',
