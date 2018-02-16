@@ -1,7 +1,7 @@
 muffnn
 ======
 
-|Travis| |PyPI| |License|
+|Travis| |PyPI|
 
 .. |Travis| image:: https://img.shields.io/travis/civisanalytics/muffnn/master.svg
    :alt: Build status
@@ -10,10 +10,6 @@ muffnn
 .. |PyPI| image:: https://img.shields.io/pypi/v/muffnn.svg
    :target: https://pypi.org/project/muffnn/
    :alt: Latest version on PyPI
-
-.. |License| image:: https://img.shields.io/pypi/l/muffnn.svg
-   :target: https://github.com/civisanalytics/muffnn/blob/master/LICENSE.txt
-   :alt: License
 
 `scikit-learn <http://scikit-learn.org>`__-compatible neural network
 models in implemented in `TensorFlow <https://www.tensorflow.org/>`__
