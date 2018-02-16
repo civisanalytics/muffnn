@@ -1,15 +1,20 @@
 muffnn
 ======
 
-.. image:: https://img.shields.io/travis/civisanalytics/muffnn/master.svg
+.. -*- mode: rst -*-
+
+|Travis| |PyPI| |License|
+
+.. |Travis| image:: https://img.shields.io/travis/civisanalytics/muffnn/master.svg
    :alt: Build status
    :target: https://travis-ci.org/civisanalytics/muffnn
 
-.. image:: https://img.shields.io/pypi/v/muffnn.svg
+.. |PyPI| image:: https://img.shields.io/pypi/v/muffnn.svg
    :target: https://pypi.org/project/muffnn/
    :alt: Latest version on PyPI
 
-.. image:: https://img.shields.io/pypi/l/muffnn.svg
+.. |License| image:: https://img.shields.io/pypi/l/muffnn.svg
+   :target: https://github.com/civisanalytics/muffnn/blob/master/LICENSE.txt
    :alt: License
 
 `scikit-learn <http://scikit-learn.org>`__-compatible neural network
