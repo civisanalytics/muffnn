@@ -1,8 +1,6 @@
 muffnn
 ======
 
-.. -*- mode: rst -*-
-
 |Travis| |PyPI| |License|
 
 .. |Travis| image:: https://img.shields.io/travis/civisanalytics/muffnn/master.svg
