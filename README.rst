@@ -1,6 +1,16 @@
 muffnn
 ======
 
+|Travis| |PyPI|
+
+.. |Travis| image:: https://img.shields.io/travis/civisanalytics/muffnn/master.svg
+   :alt: Build status
+   :target: https://travis-ci.org/civisanalytics/muffnn
+
+.. |PyPI| image:: https://img.shields.io/pypi/v/muffnn.svg
+   :target: https://pypi.org/project/muffnn/
+   :alt: Latest version on PyPI
+
 `scikit-learn <http://scikit-learn.org>`__-compatible neural network
 models in implemented in `TensorFlow <https://www.tensorflow.org/>`__
 
