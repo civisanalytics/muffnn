@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Added `prediction_gradient` method for understanding the impact of different
+  features in MLPs with dense inputs.
+
 ### Fixed
 
 - Exposed `muffnn.__version__`.
