@@ -309,17 +309,21 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             self._prediction_gradient = None
         else:
             output_shape = self.output_layer_.get_shape()
+            # Note: tf.gradients returns a list of gradients dy/dx, one per
+            # given x.
             if len(output_shape) == 1:
                 self._prediction_gradient = tf.gradients(
                     t, self._input_values)[0]
-            else:
+            elif len(output_shape) == 2:
                 # According to the tf.gradients documentation, it looks like
                 # we have to compute gradients separately for each output
                 # dimension and then stack them for multiclass/label data.
                 self._prediction_gradient = tf.stack([
                     tf.gradients(t[:, i], self._input_values)[0]
-                    for i in range(self.output_layer_.get_shape()[1])
+                    for i in range(output_shape[1])
                 ], axis=1)
+            else:  # sanity check
+                raise ValueError("Unexpected output shape")
 
         self._sample_weight = \
             tf.placeholder(np.float32, [None], "sample_weight")
@@ -489,6 +493,10 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         https://arxiv.org/abs/1704.02685) for discussion and further
         references. This function can also be used for the "gradient x input"
         technique described by Shrikumar (2017).
+
+        When using this method, be careful to consider the variance of the
+        features when interpreting the results. You may want to use scale
+        the values to [0, 1] or to have a mean of 0 and variance of 1.
         """
         if not self._is_fitted:
             raise NotFittedError("Call fit first.")

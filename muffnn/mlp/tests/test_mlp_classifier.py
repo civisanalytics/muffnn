@@ -365,13 +365,15 @@ def test_prediction_gradient():
     n_classes = 1
     mlp = MLPClassifier(n_epochs=100, random_state=42, hidden_units=(5,))
     X, y = make_classification(
-        n_samples=1000, n_informative=n_classes, n_redundant=0,
+        n_samples=1000, n_features=20, n_informative=n_classes, n_redundant=0,
         n_classes=n_classes, n_clusters_per_class=1, shuffle=False)
     mlp.fit(X, y)
     grad = mlp.prediction_gradient(X)
     grad_means = grad.mean(axis=0)
     assert grad.shape == X.shape
     # Check that only the informative feature has a large gradient.
+    # The values of 1 and 0.5 here are somewhat arbitrary but should serve as
+    # a regression test if nothing else.
     assert np.abs(grad_means[0]) > 1.
     for m in grad_means[1:]:
         assert np.abs(m) < 0.5
@@ -380,8 +382,9 @@ def test_prediction_gradient():
     # the output is the right shape.
     n_classes = 5
     X, y = make_classification(
-        n_samples=1000, n_classes=n_classes, n_informative=n_classes,
-        n_redundant=0, shuffle=False, n_clusters_per_class=1)
+        n_samples=1000, n_features=20, n_informative=n_classes,
+        n_redundant=0, n_classes=n_classes, n_clusters_per_class=1,
+        shuffle=False)
     mlp.fit(X, y)
     grad = mlp.prediction_gradient(X)
     assert grad.shape == (X.shape[0], n_classes, X.shape[1])
