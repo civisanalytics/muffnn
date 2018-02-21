@@ -310,7 +310,8 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         else:
             output_shape = self.output_layer_.get_shape()
             # Note: tf.gradients returns a list of gradients dy/dx, one per
-            # given x.
+            # input tensor x. In other words,
+            # [ tensor(n_features x n_gradients) ].
             if len(output_shape) == 1:
                 self._prediction_gradient = tf.gradients(
                     t, self._input_values)[0]
