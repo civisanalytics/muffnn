@@ -301,6 +301,31 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         if self._transform_layer_index == -1:
             self._transform_layer = t
 
+        # Prediction gradients (e.g., for analyzing the importance of features)
+        # We use the top layer before the output activation function
+        # (e.g., softmax, sigmoid) following
+        # https://arxiv.org/pdf/1312.6034.pdf
+        if self.is_sparse_:
+            self._prediction_gradient = None
+        else:
+            output_shape = self.output_layer_.get_shape()
+            # Note: tf.gradients returns a list of gradients dy/dx, one per
+            # input tensor x. In other words,
+            # [ tensor(n_features x n_gradients) ].
+            if len(output_shape) == 1:
+                self._prediction_gradient = tf.gradients(
+                    t, self._input_values)[0]
+            elif len(output_shape) == 2:
+                # According to the tf.gradients documentation, it looks like
+                # we have to compute gradients separately for each output
+                # dimension and then stack them for multiclass/label data.
+                self._prediction_gradient = tf.stack([
+                    tf.gradients(t[:, i], self._input_values)[0]
+                    for i in range(output_shape[1])
+                ], axis=1)
+            else:  # sanity check
+                raise ValueError("Unexpected output shape")
+
         self._sample_weight = \
             tf.placeholder(np.float32, [None], "sample_weight")
 
@@ -347,15 +372,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         if not self._is_fitted:
             raise NotFittedError("Call fit before prediction")
 
-        X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])
-
-        if self.is_sparse_:
-            # For sparse input, make the input a CSR matrix since it can be
-            # indexed by row.
-            X = X.tocsr() if sp.issparse(X) else sp.csr_matrix(X)
-        elif sp.issparse(X):
-            # Convert sparse input to dense.
-            X = X.todense().A
+        X = self._check_X(X)
 
         # Make predictions in batches.
         pred_batches = []
@@ -371,6 +388,19 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
                     self._session.run(self.output_layer_, feed_dict=feed_dict))
         y_pred = np.concatenate(pred_batches)
         return y_pred
+
+    def _check_X(self, X):
+        X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])
+
+        if self.is_sparse_:
+            # For sparse input, make the input a CSR matrix since it can be
+            # indexed by row.
+            X = X.tocsr() if sp.issparse(X) else sp.csr_matrix(X)
+        elif sp.issparse(X):
+            # Convert sparse input to dense.
+            X = X.todense().A
+
+        return X
 
     @abstractmethod
     def predict(self, X):
@@ -392,15 +422,7 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
         if not self._is_fitted:
             raise NotFittedError("Call fit before transform")
 
-        X = check_array(X, accept_sparse=['csr', 'dok', 'lil', 'csc', 'coo'])
-
-        if self.is_sparse_:
-            # For sparse input, make the input a CSR matrix since it can be
-            # indexed by row.
-            X = X.tocsr() if sp.issparse(X) else sp.csr_matrix(X)
-        elif sp.issparse(X):
-            # Convert sparse input to dense.
-            X = X.todense().A
+        X = self._check_X(X)
 
         # Make predictions in batches.
         embed_batches = []
@@ -444,6 +466,64 @@ class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
             else:
                 # fit method of arity 2 (supervised transformation)
                 return self.fit(X, y, **fit_params).transform(X)
+
+    def prediction_gradient(self, X):
+        """Compute the prediction gradient with respect to the given inputs.
+
+        Parameters
+        ----------
+        X : numpy array of shape [n_samples, n_features]
+            Examples to compute feature importance based on.
+
+        Returns
+        -------
+        numpy array
+            Array of gradients for each example. For single-class or regression
+            problems, this will be of shape [n_samples, n_features].
+            For multilabel or multiclass problems, it will be of shape
+            [n_samples, n_classes, n_features].
+
+        Notes
+        -----
+        This is related to what is sometimes referred to as
+        "sensitivity analysis" (e.g., Simonyan et al., ICLR 2014). There are
+        more complex methods for computing the effects of input features on
+        outputs (e.g., SHAP, LIME, layerwise relevance propagation, DeepLIFT),
+        but using prediction gradients is fast and simple, and also has
+        theoretical connections to other methods.  See, e.g., Shrikumar (2017,
+        https://arxiv.org/abs/1704.02685) for discussion and further
+        references. This function can also be used for the "gradient x input"
+        technique described by Shrikumar (2017).
+
+        When using this method, be careful to consider the variance of the
+        features when interpreting the results. You may want to use scale
+        the values to [0, 1] or to have a mean of 0 and variance of 1.
+        """
+        if not self._is_fitted:
+            raise NotFittedError("Call fit first.")
+
+        if self.is_sparse_:
+            raise NotImplementedError("Not implemented for sparse inputs.")
+
+        X = self._check_X(X)
+
+        # Compute gradients in batches.
+        imprt_vals = []
+        start_idx = 0
+        n_examples = X.shape[0]
+        with self.graph_.as_default():
+            while start_idx < n_examples:
+                X_batch = \
+                    X[start_idx:min(start_idx + self.batch_size, n_examples)]
+                feed_dict = self._make_feed_dict(X_batch)
+                start_idx += self.batch_size
+                imprt_vals.append(
+                    self._session.run(self._prediction_gradient,
+                                      feed_dict=feed_dict))
+
+        imprt_vals = np.concatenate(imprt_vals)
+
+        return imprt_vals
 
 
 def _sparse_matrix_data(X):

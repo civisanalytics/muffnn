@@ -5,11 +5,12 @@ from __future__ import print_function
 from __future__ import division
 
 import numpy as np
+import pytest
 from sklearn.utils.testing import \
     assert_equal, assert_array_almost_equal
 import scipy.sparse as sp
 from scipy.stats import pearsonr
-from sklearn.datasets import (load_diabetes, make_regression)
+from sklearn.datasets import load_diabetes, make_regression
 from sklearn.utils.estimator_checks import check_estimator
 from tensorflow import nn
 
@@ -139,3 +140,24 @@ def test_embedding_specific_layer():
     clf.fit(X, y)
 
     assert clf.transform(X).shape[1] == 8
+
+
+def test_prediction_gradient():
+    """Test computation of prediction gradients."""
+    mlp = MLPRegressor(n_epochs=100, random_state=42, hidden_units=(5,))
+    X, y = make_regression(
+        n_samples=1000, n_features=10, n_informative=1, shuffle=False)
+    mlp.fit(X, y)
+    grad = mlp.prediction_gradient(X)
+    grad_means = grad.mean(axis=0)
+    assert grad.shape == X.shape
+    # Check that only the informative feature has a large gradient.
+    assert np.abs(grad_means[0]) > 0.5
+    for m in grad_means[1:]:
+        assert np.abs(m) < 0.1
+
+    # Raise an exception for sparse inputs, which are not yet supported.
+    X_sp = sp.csr_matrix(X)
+    mlp.fit(X_sp, y)
+    with pytest.raises(NotImplementedError):
+        mlp.prediction_gradient(X_sp)

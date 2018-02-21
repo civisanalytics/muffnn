@@ -357,3 +357,47 @@ def test_sample_weight(make_dataset_func, dataset_kwargs):
         lambda: MLPClassifier(n_epochs=30, random_state=42,
                               keep_prob=0.8, hidden_units=(128,))
     )
+
+
+def test_prediction_gradient():
+    """Test computation of prediction gradients."""
+    # Binary classification
+    n_classes = 1
+    mlp = MLPClassifier(n_epochs=100, random_state=42, hidden_units=(5,))
+    X, y = make_classification(
+        n_samples=1000, n_features=20, n_informative=n_classes, n_redundant=0,
+        n_classes=n_classes, n_clusters_per_class=1, shuffle=False)
+    mlp.fit(X, y)
+    grad = mlp.prediction_gradient(X)
+    grad_means = grad.mean(axis=0)
+    assert grad.shape == X.shape
+    # Check that only the informative feature has a large gradient.
+    # The values of 1 and 0.5 here are somewhat arbitrary but should serve as
+    # a regression test if nothing else.
+    assert np.abs(grad_means[0]) > 1.
+    for m in grad_means[1:]:
+        assert np.abs(m) < 0.5
+
+    # Multiclass classification: here, we'll just check that it runs and that
+    # the output is the right shape.
+    n_classes = 5
+    X, y = make_classification(
+        n_samples=1000, n_features=20, n_informative=n_classes,
+        n_redundant=0, n_classes=n_classes, n_clusters_per_class=1,
+        shuffle=False)
+    mlp.fit(X, y)
+    grad = mlp.prediction_gradient(X)
+    assert grad.shape == (X.shape[0], n_classes, X.shape[1])
+
+    # Multilabel binary classification.
+    X, y = make_multilabel_classification(
+        n_samples=1000, random_state=42, n_classes=n_classes)
+    mlp.fit(X, y)
+    grad = mlp.prediction_gradient(X)
+    assert grad.shape == (X.shape[0], n_classes, X.shape[1])
+
+    # Raise an exception for sparse inputs, which are not yet supported.
+    X_sp = sp.csr_matrix(X)
+    mlp.fit(X_sp, y)
+    with pytest.raises(NotImplementedError):
+        mlp.prediction_gradient(X_sp)
