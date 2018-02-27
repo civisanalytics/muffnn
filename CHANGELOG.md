@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - Exposed `muffnn.__version__`.
+- Fixed bug in `FMClassifier` where it failed for predicting one example.
 
 ## [2.1.0] - 2018-02-12
 
@@ -31,13 +32,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
-- Added a `transform_layer_index` keyword and `transform` method to the 
+- Added a `transform_layer_index` keyword and `transform` method to the
   MLPClassifier and MLPRegressor to extract features from a hidden layer (#62).
 
 ### Changed
 
 - Moved the MLPClassifier and MLPRegressor to using
-  [Xavier initialization](https://www.tensorflow.org/api_docs/python/tf/contrib/layers/xavier_initializer) (#68). 
+  [Xavier initialization](https://www.tensorflow.org/api_docs/python/tf/contrib/layers/xavier_initializer) (#68).
 
 ## [1.2.0] - 2017-09-21
 

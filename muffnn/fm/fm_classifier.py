@@ -413,8 +413,8 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                 feed_dict = self._make_feed_dict(
                     X_batch, np.zeros(self.n_dims_))
                 start_idx += self.batch_size
-                probs.append(self._y_proba.eval(
-                    session=self._session, feed_dict=feed_dict))
+                probs.append(np.atleast_1d(self._y_proba.eval(
+                    session=self._session, feed_dict=feed_dict)))
 
         probs = np.concatenate(probs, axis=0)
         if probs.ndim == 1:

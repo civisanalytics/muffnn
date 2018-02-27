@@ -179,6 +179,22 @@ def test_partial_fit():
         clf.partial_fit(X, y, classes=np.array([0, 1]))
 
 
+def test_predict_one():
+    """Check that right sized array is return when doing one prediction."""
+
+    X, y = iris.data, iris.target
+
+    clf = FMClassifier(n_epochs=1)
+    clf.fit(X, y)
+    p = clf.predict_proba(X[0:1, :])
+    assert p.shape == (1, 3)
+
+    y_binary = (y == y[0]).astype(float)
+    clf.fit(X, y_binary)
+    p = clf.predict_proba(X[0:1, :])
+    assert p.shape == (1, 2)
+
+
 def test_refitting():
     """Check that fitting twice works (e.g., to make sure that fit-related
     variables are cleared appropriately when refitting)."""
