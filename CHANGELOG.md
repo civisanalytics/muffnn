@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Exposed `muffnn.__version__`.
 - Fixed bug in `FMClassifier` where it failed for predicting one example.
-- Fixed ValueError for type of target in MLPClassifier (#90).
+- Fixed ValueError for type of target in MLPClassifier and FMClassifier (#90).
 
 ## [2.1.0] - 2018-02-12
 
