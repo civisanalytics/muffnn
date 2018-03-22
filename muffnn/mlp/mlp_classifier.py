@@ -217,7 +217,7 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
         else:
             # Raise an error, as in
             # sklearn.utils.multiclass.check_classification_targets.
-            raise ValueError("Unknown label type: %r" % y)
+            raise ValueError("Unknown label type: %s" % target_type)
 
     def _fit_targets(self, y, classes=None):
         self.multilabel_ = self._is_multilabel(y)
