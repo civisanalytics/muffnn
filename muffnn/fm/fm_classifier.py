@@ -273,7 +273,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         if target_type not in ['binary', 'multiclass']:
             # Raise an error, as in
             # sklearn.utils.multiclass.check_classification_targets.
-            raise ValueError("Unknown label type: %r" % y)
+            raise ValueError("Unknown label type: %s" % target_type)
 
         # Initialize the model if it hasn't been already by a previous call.
         if not self._is_fitted:
