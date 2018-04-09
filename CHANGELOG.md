@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Fixed bug in `FMClassifier` where it failed for predicting one example.
 - Fixed ValueError for type of target in MLPClassifier and FMClassifier (#90).
 
+### Changed
+
+- Switched to requiring TensorFlow 1.6 or greater.
+
 ## [2.1.0] - 2018-02-12
 
 ### Added
