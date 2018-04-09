@@ -20,7 +20,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
-- Updated requirements on TensorFlow 1.6 or greater.
 - Updated requirements on numpy to 1.14 or higher.
 - Updated requirements on scipy to 1.0 or higher.
 
