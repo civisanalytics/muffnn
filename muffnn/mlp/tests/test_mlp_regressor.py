@@ -106,22 +106,6 @@ def test_partial_fit():
     assert pearsonr(y_pred, y)[0] > 0.5
 
 
-def test_alpha_dropout_and_selu():
-    """Test regression with SEUL and alpha dropout."""
-    # Check that predictions are deterministic.
-    clf = MLPRegressor(keep_prob=0.7, activation=nn.selu, **KWARGS)
-    clf.fit(X_sp, Y)
-    y_pred1 = clf.predict_proba(X_sp)
-    for _ in range(100):
-        y_pred_i = clf.predict_proba(X_sp)
-        assert_array_almost_equal(y_pred1, y_pred_i)
-
-    check_predictions(
-        MLPRegressor(keep_prob=0.7, activation=nn.selu, **KWARGS), X, Y)
-    check_predictions(
-        MLPRegressor(keep_prob=0.7, activation=nn.selu, **KWARGS), X_sp, Y)
-
-
 def test_embedding_default():
     # Make sure the embedding works by default.
     data = load_diabetes()
