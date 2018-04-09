@@ -108,7 +108,11 @@ class MLPClassifier(MLPBaseEstimator, ClassifierMixin):
                        scope='output_layer', sparse_input=True)
         else:
             if self.keep_prob != 1.0:
-                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+                if self.activation is tf.nn.selu:
+                    t = tf.contrib.nn.alpha_dropout(
+                        t, keep_prob=self._keep_prob)
+                else:
+                    t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, output_size, scope='output_layer')
 
         if self.multilabel_:

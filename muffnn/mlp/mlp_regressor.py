@@ -101,7 +101,11 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
                        scope='output_layer', sparse_input=True)
         else:
             if self.keep_prob != 1.0:
-                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+                if self.activation is tf.nn.selu:
+                    t = tf.contrib.nn.alpha_dropout(
+                        t, keep_prob=self._keep_prob)
+                else:
+                    t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, 1, scope='output_layer')
 
         self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")

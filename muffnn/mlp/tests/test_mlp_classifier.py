@@ -215,6 +215,22 @@ def test_dropout():
         MLPClassifier(keep_prob=0.5, **KWARGS), X_sp, Y1)
 
 
+def test_alpha_dropout_and_selu():
+    """Test binary classification with SEUL and alpha dropout."""
+    # Check that predictions are deterministic.
+    clf = MLPClassifier(keep_prob=0.7, activation=nn.selu, **KWARGS)
+    clf.fit(X_sp, Y1)
+    y_pred1 = clf.predict_proba(X_sp)
+    for _ in range(100):
+        y_pred_i = clf.predict_proba(X_sp)
+        assert_array_almost_equal(y_pred1, y_pred_i)
+
+    check_predictions(
+        MLPClassifier(keep_prob=0.7, activation=nn.selu, **KWARGS), X, Y1)
+    check_predictions(
+        MLPClassifier(keep_prob=0.7, activation=nn.selu, **KWARGS), X_sp, Y1)
+
+
 def test_multiple_layers():
     for n_layers in range(3):
         clf = MLPClassifier(hidden_units=(8,) * n_layers, **KWARGS)
