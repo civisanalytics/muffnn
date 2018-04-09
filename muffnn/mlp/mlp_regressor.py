@@ -42,7 +42,9 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
         dropout will not be used. cf. `TensorFlow documentation
         <https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dropout>`
     activation : callable, optional
-        The activation function.  See tensorflow.python.ops.nn.
+        The activation function.  See tensorflow.python.ops.nn. Setting this to
+        tf.nn.selu will also cause alpha dropout to be used, implementing a
+        Self-Normalizing Neural Network (Klambauer et al., 2017).
     random_state : int, RandomState instance or None, optional
         If int, the random number generator seed. If RandomState instance,
         the random number generator itself. If None, then `np.random` will be
@@ -101,7 +103,11 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
                        scope='output_layer', sparse_input=True)
         else:
             if self.keep_prob != 1.0:
-                t = tf.nn.dropout(t, keep_prob=self._keep_prob)
+                if self.activation is tf.nn.selu:
+                    t = tf.contrib.nn.alpha_dropout(
+                        t, keep_prob=self._keep_prob)
+                else:
+                    t = tf.nn.dropout(t, keep_prob=self._keep_prob)
             t = affine(t, 1, scope='output_layer')
 
         self.input_targets_ = tf.placeholder(tf.float32, [None], "targets")

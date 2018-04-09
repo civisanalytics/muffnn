@@ -10,12 +10,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Added `prediction_gradient` method for understanding the impact of different
   features in MLPs with dense inputs.
+- Added support for SELU activations with alpha dropout.
 
 ### Fixed
 
 - Exposed `muffnn.__version__`.
 - Fixed bug in `FMClassifier` where it failed for predicting one example.
 - Fixed ValueError for type of target in MLPClassifier and FMClassifier (#90).
+
+### Changed
+
+- Updated requirements on numpy to 1.14 or higher.
+- Updated requirements on scipy to 1.0 or higher.
 
 ## [2.1.0] - 2018-02-12
 
