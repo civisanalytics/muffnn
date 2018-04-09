@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Added `prediction_gradient` method for understanding the impact of different
   features in MLPs with dense inputs.
+- Added support for SELU activations with alpha dropout.
 
 ### Fixed
 
