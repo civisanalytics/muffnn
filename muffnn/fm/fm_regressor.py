@@ -8,11 +8,9 @@ import scipy.sparse as sp
 import numpy as np
 import tensorflow as tf
 
-from sklearn.base import ClassifierMixin, BaseEstimator
+from sklearn.base import RegressorMixin, BaseEstimator
 from sklearn.utils import check_X_y, check_array, check_random_state
-from sklearn.utils.multiclass import type_of_target
 from sklearn.exceptions import NotFittedError
-from sklearn.preprocessing import LabelEncoder
 
 from muffnn.core import TFPicklingBase
 
@@ -20,8 +18,8 @@ from muffnn.core import TFPicklingBase
 _LOGGER = logging.getLogger(__name__)
 
 
-class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
-    """Factorization machine classifier.
+class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
+    """Factorization machine regressor.
 
     Parameters
     ----------
@@ -57,10 +55,6 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
     ----------
     n_dims_ : int
         Number of input dimensions.
-    classes_ : array
-        Classes from the data.
-    n_classes_ : int
-        Number of classes.
     is_sparse_ : bool
         Whether a model taking sparse input was fit.
     """
@@ -98,10 +92,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             x2 = self._x * self._x
             matmul = tf.matmul
 
-        if self._output_size == 1:
-            self._y = tf.placeholder(tf.float32, [None], "y")
-        else:
-            self._y = tf.placeholder(tf.int32, [None], "y")
+        self._y = tf.placeholder(tf.float32, [None], "y")
 
         with tf.variable_scope("fm"):
             self._v = tf.get_variable(
@@ -116,22 +107,11 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         v2x2 = tf.stack([matmul(x2, v2[i, :, :])
                          for i in range(self.rank)], axis=-1)
         int_term = 0.5 * tf.reduce_sum(tf.square(vx) - v2x2, axis=-1)
-        self._logit_y_proba \
+        self._y_hat \
             = self._beta0 + matmul(self._x, self._beta) + int_term
 
-        if self._output_size == 1:
-            self._logit_y_proba = tf.squeeze(self._logit_y_proba)
-            self._obj_func = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=self._logit_y_proba,
-                    labels=self._y))
-            self._y_proba = tf.sigmoid(self._logit_y_proba)
-        else:
-            self._obj_func = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    logits=self._logit_y_proba,
-                    labels=self._y))
-            self._y_proba = tf.nn.softmax(self._logit_y_proba)
+        self._y_hat = tf.squeeze(self._y_hat)
+        self._obj_func = tf.reduce_mean(tf.square(self._y - self._y_hat))
 
         if self.lambda_v > 0:
             self._obj_func \
@@ -168,10 +148,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         else:
             feed_dict = {self._x: X.astype(np.float32)}
 
-        if self._output_size == 1:
-            feed_dict[self._y] = y.astype(np.float32)
-        else:
-            feed_dict[self._y] = y.astype(np.int32)
+        feed_dict[self._y] = y.astype(np.float32)
 
         return feed_dict
 
@@ -190,7 +167,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
 
     def __getstate__(self):
         # Handles TF persistence
-        state = super(FMClassifier, self).__getstate__()
+        state = super(FMRegressor, self).__getstate__()
 
         # Add attributes of this estimator
         state.update(dict(rank=self.rank,
@@ -207,9 +184,6 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         if self._is_fitted:
             state['n_dims_'] = self.n_dims_
             state['_random_state'] = self._random_state
-            state['_enc'] = self._enc
-            state['classes_'] = self.classes_
-            state['n_classes_'] = self.n_classes_
             state['_output_size'] = self._output_size
             state['is_sparse_'] = self.is_sparse_
 
@@ -223,7 +197,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         X : numpy array or sparse matrix [n_samples, n_features]
             Training data.
         y : numpy array [n_samples]
-            Targets.
+            Outcome.
 
         Returns
         -------
@@ -238,7 +212,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         # Call partial fit, which will initialize and then train the model.
         return self.partial_fit(X, y)
 
-    def partial_fit(self, X, y, classes=None, monitor=None):
+    def partial_fit(self, X, y, monitor=None):
         """Fit the classifier.
 
         Parameters
@@ -246,11 +220,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         X : numpy array or sparse matrix [n_samples, n_features]
             Training data.
         y : numpy array [n_samples]
-            Targets.
-        classes : array, shape (n_classes,)
-            Classes to be used across calls to partial_fit.  If not set in the
-            first call, it will be inferred from the given targets. If
-            subsequent calls include additional classes, they will fail.
+            Outcome.
         monitor : callable, optional
             The monitor is called after each iteration with the current
             iteration, a reference to the estimator, and a dictionary with
@@ -266,14 +236,8 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         self : returns an instance of self.
         """
 
-        X, y = check_X_y(X, y, accept_sparse='csr')
-
-        # check target type
-        target_type = type_of_target(y)
-        if target_type not in ['binary', 'multiclass']:
-            # Raise an error, as in
-            # sklearn.utils.multiclass.check_classification_targets.
-            raise ValueError("Unknown label type: %s" % target_type)
+        # TODO test this fails on multioutput
+        X, y = check_X_y(X, y, accept_sparse='csr', multi_output=False)
 
         # Initialize the model if it hasn't been already by a previous call.
         if not self._is_fitted:
@@ -281,19 +245,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             assert self.batch_size > 0, "batch_size <= 0"
 
             self.n_dims_ = X.shape[1]
-
-            if classes is not None:
-                self._enc = LabelEncoder().fit(classes)
-            else:
-                self._enc = LabelEncoder().fit(y)
-
-            self.classes_ = self._enc.classes_
-            self.n_classes_ = len(self.classes_)
-
-            if self.n_classes_ <= 2:
-                self._output_size = 1
-            else:
-                self._output_size = self.n_classes_
+            self._output_size = 1
 
             if sp.issparse(X):
                 self.is_sparse_ = True
@@ -325,7 +277,6 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         # transform targets
         if sp.issparse(y):
             y = y.toarray()
-        y = self._enc.transform(y)
 
         # Train the model with the given data.
         with self.graph_.as_default():
@@ -362,8 +313,8 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
 
         return self
 
-    def predict_log_proba(self, X):
-        """Compute log p(y=1).
+    def predict(self, X):
+        """Predict expected y values.
 
         Parameters
         ----------
@@ -373,28 +324,11 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         Returns
         -------
         numpy array [n_samples]
-            Log probabilities.
-        """
-        if not self._is_fitted:
-            raise NotFittedError("Call fit before predict_log_proba!")
-        return np.log(self.predict_proba(X))
-
-    def predict_proba(self, X):
-        """Compute p(y=1).
-
-        Parameters
-        ----------
-        X : numpy array or sparse matrix [n_samples, n_features]
-            Data.
-
-        Returns
-        -------
-        numpy array [n_samples]
-            Probabilities.
+            Estimated regression predictions.
         """
 
         if not self._is_fitted:
-            raise NotFittedError("Call fit before predict_proba!")
+            raise NotFittedError("Call fit before predict!")
 
         X = check_array(X, accept_sparse='csr')
 
@@ -403,7 +337,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         self._check_data(X)
 
         # Compute weights in batches.
-        probs = []
+        yhat = []
         start_idx = 0
         n_examples = X.shape[0]
         with self.graph_.as_default():
@@ -413,28 +347,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                 feed_dict = self._make_feed_dict(
                     X_batch, np.zeros(self.n_dims_))
                 start_idx += self.batch_size
-                probs.append(np.atleast_1d(self._y_proba.eval(
+                yhat.append(np.atleast_1d(self._y_hat.eval(
                     session=self._session, feed_dict=feed_dict)))
 
-        probs = np.concatenate(probs, axis=0)
-        if probs.ndim == 1:
-            return np.column_stack([1.0 - probs, probs])
-        else:
-            return probs
-
-    def predict(self, X):
-        """Compute the predicted class.
-
-        Parameters
-        ----------
-        X : numpy array or sparse matrix [n_samples, n_features]
-            Data.
-
-        Returns
-        -------
-        numpy array [n_samples]
-            Predicted class.
-        """
-        if not self._is_fitted:
-            raise NotFittedError("Call fit before predict!")
-        return self.classes_[self.predict_proba(X).argmax(axis=1)]
+        return np.concatenate(yhat, axis=0)
