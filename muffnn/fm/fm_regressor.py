@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import division
 
 import logging
+from warnings import warn
 import re
 
 import scipy.sparse as sp
@@ -41,8 +42,6 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         L2 regularization strength for the low-rank embedding.
     lambda_beta : float, optional
         L2 regularization strength for the linear coefficients.
-    init_scale : float, optional
-        Standard deviation of random normal initialization.
     solver : a subclass of `tf.train.Optimizer` or str, optional
         Solver to use. If a string is passed, then the corresponding solver
         from `scipy.optimize.minimize` is used.
@@ -61,7 +60,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
     def __init__(self, rank=8, batch_size=64, n_epochs=5,
                  random_state=None, lambda_v=0.0,
                  lambda_beta=0.0, solver=tf.train.AdadeltaOptimizer,
-                 init_scale=0.1, solver_kwargs=None):
+                 solver_kwargs=None):
         self.rank = rank
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -69,7 +68,6 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         self.lambda_v = lambda_v
         self.lambda_beta = lambda_beta
         self.solver = solver
-        self.init_scale = init_scale
         self.solver_kwargs = solver_kwargs
 
     def _set_up_graph(self):
@@ -165,6 +163,27 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                                  "not match the number assumed by the "
                                  "estimator!")
 
+    def _fit_target(self, y):
+        # Store the mean and S.D. of the targets so we can have standardized
+        # y for training but still make predictions on the original scale.
+
+        self.target_mean_ = np.mean(y)
+
+        self.target_sd_ = np.std(y - self.target_mean_)
+        if self.target_sd_ <= 0:
+            warn("No variance in regression targets.")
+
+    def _transform_target(self, y):
+        # Standardize the targets for fitting, and store the M and SD values
+        # for prediction.
+
+        y_centered = y - self.target_mean_
+
+        if self.target_sd_ <= 0:
+            return y_centered
+
+        return y_centered / self.target_sd_
+
     def __getstate__(self):
         # Handles TF persistence
         state = super(FMRegressor, self).__getstate__()
@@ -177,7 +196,6 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                           lambda_v=self.lambda_v,
                           lambda_beta=self.lambda_beta,
                           solver=self.solver,
-                          init_scale=self.init_scale,
                           solver_kwargs=self.solver_kwargs))
 
         # Add fitted attributes if the model has been fitted.
@@ -186,6 +204,8 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
             state['_random_state'] = self._random_state
             state['_output_size'] = self._output_size
             state['is_sparse_'] = self.is_sparse_
+            state['target_mean_'] = self.target_mean_
+            state['target_sd_'] = self.target_sd_
 
         return state
 
@@ -251,6 +271,8 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         if not self._is_fitted:
             self._random_state = check_random_state(self.random_state)
             assert self.batch_size > 0, "batch_size <= 0"
+            self._fit_target(y)
+            y = self._transform_target(y)
 
             self.n_dims_ = X.shape[1]
             self._output_size = 1
@@ -277,6 +299,8 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
 
             # Set an attributed to mark this as at least partially fitted.
             self._is_fitted = True
+        else:
+            y = self._transform_target(y)
 
         # Check input data against internal data.
         # Raises an error on failure.
@@ -358,4 +382,12 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                 yhat.append(np.atleast_1d(self._y_hat.eval(
                     session=self._session, feed_dict=feed_dict)))
 
-        return np.concatenate(yhat, axis=0)
+        yhat = np.concatenate(yhat, axis=0)
+
+        # Put the prediction back on the scale of the target values
+        # (cf. _transform_targets).
+        if self.target_sd_ > 0.0:
+            yhat *= self.target_sd_
+        yhat += self.target_mean_
+
+        return yhat
