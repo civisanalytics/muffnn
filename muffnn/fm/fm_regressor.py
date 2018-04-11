@@ -189,7 +189,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
 
         return state
 
-    def fit(self, X, y):
+    def fit(self, X, y, monitor=None):
         """Fit the classifier.
 
         Parameters
@@ -198,6 +198,15 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
             Training data.
         y : numpy array [n_samples]
             Outcome.
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshotting.
 
         Returns
         -------
@@ -210,7 +219,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X, y)
+        return self.partial_fit(X, y, monitor)
 
     def partial_fit(self, X, y, monitor=None):
         """Fit the classifier.
@@ -236,7 +245,6 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
 
-        # TODO test this fails on multioutput
         X, y = check_X_y(X, y, accept_sparse='csr', multi_output=False)
 
         # Initialize the model if it hasn't been already by a previous call.
