@@ -268,7 +268,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                 tf.set_random_seed(self._random_state.randint(0, 10000000))
 
                 tf.get_variable_scope().set_initializer(
-                    tf.random_normal_initializer(stddev=self.init_scale))
+                    tf.contrib.layers.xavier_initializer())
 
                 self._build_tf_graph()
 
