@@ -42,6 +42,8 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         L2 regularization strength for the low-rank embedding.
     lambda_beta : float, optional
         L2 regularization strength for the linear coefficients.
+    init_scale : float, optional
+        Standard deviation of random normal initialization.
     solver : a subclass of `tf.train.Optimizer` or str, optional
         Solver to use. If a string is passed, then the corresponding solver
         from `scipy.optimize.minimize` is used.
@@ -60,7 +62,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
     def __init__(self, rank=8, batch_size=64, n_epochs=5,
                  random_state=None, lambda_v=0.0,
                  lambda_beta=0.0, solver=tf.train.AdadeltaOptimizer,
-                 solver_kwargs=None):
+                 init_scale=0.1, solver_kwargs=None):
         self.rank = rank
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -68,6 +70,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
         self.lambda_v = lambda_v
         self.lambda_beta = lambda_beta
         self.solver = solver
+        self.init_scale = init_scale
         self.solver_kwargs = solver_kwargs
 
     def _set_up_graph(self):
@@ -196,6 +199,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                           lambda_v=self.lambda_v,
                           lambda_beta=self.lambda_beta,
                           solver=self.solver,
+                          init_scale=self.init_scale,
                           solver_kwargs=self.solver_kwargs))
 
         # Add fitted attributes if the model has been fitted.
@@ -290,7 +294,7 @@ class FMRegressor(TFPicklingBase, RegressorMixin, BaseEstimator):
                 tf.set_random_seed(self._random_state.randint(0, 10000000))
 
                 tf.get_variable_scope().set_initializer(
-                    tf.contrib.layers.xavier_initializer())
+                    tf.random_normal_initializer(stddev=self.init_scale))
 
                 self._build_tf_graph()
 

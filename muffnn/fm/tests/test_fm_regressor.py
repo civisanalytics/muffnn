@@ -50,7 +50,6 @@ def check_predictions(est, X, y):
     assert_array_almost_equal(preds, y, decimal=1)
 
 
-# TODO remove this -- it is only used for `check_estimator`
 class FMRegressorLBFGSB(FMRegressor):
     def __init__(self):
         super(FMRegressorLBFGSB, self).__init__(
