@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 from scipy.misc import logsumexp
-from sklearn.datasets import load_iris
+from sklearn.datasets import load_iris, make_classification
 from sklearn.linear_model.tests.test_logistic import check_predictions
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.metrics import accuracy_score
@@ -22,7 +22,8 @@ from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_predict, KFold
 
-from ..fm_classifier import FMClassifier
+from muffnn import FMClassifier
+from muffnn.fm.tests.util import assert_sample_weights_work
 
 iris = load_iris()
 X = [[-1, 0], [0, 1], [1, 1]]
@@ -56,6 +57,7 @@ def test_make_feed_dict():
     clf.is_sparse_ = False
     clf._y = 0
     clf._x = 1
+    clf._sample_weight = "sample_weight"
     for output_size in [1, 2, 3]:
         clf._output_size = output_size
         fd = clf._make_feed_dict(np.array(X), np.array(Y1))
@@ -79,6 +81,7 @@ def test_make_feed_dict_sparse():
     clf._x_inds = 1
     clf._x_vals = 2
     clf._x_shape = 3
+    clf._sample_weight = "sample_weight"
 
     # changing this so test catches indexing errors
     X = [[-1, 0], [0, 1], [2, 3]]
@@ -278,3 +281,12 @@ def test_model_computations_softmax():
     y_proba_test = np.exp(logit_y_proba -
                           logsumexp(logit_y_proba, axis=-1)[:, np.newaxis])
     assert_array_almost_equal(y_proba, y_proba_test)
+
+
+def test_sample_weight():
+    assert_sample_weights_work(
+        make_classification,
+        {'n_samples': 3000},
+        # TF SGD does not work so well....
+        lambda: FMClassifier(rank=2, solver='L-BFGS-B', random_state=4567)
+    )
