@@ -98,6 +98,9 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             x2 = self._x * self._x
             matmul = tf.matmul
 
+        self._sample_weight = \
+            tf.placeholder(np.float32, [None], "sample_weight")
+
         if self._output_size == 1:
             self._y = tf.placeholder(tf.float32, [None], "y")
         else:
@@ -119,18 +122,25 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         self._logit_y_proba \
             = self._beta0 + matmul(self._x, self._beta) + int_term
 
+        def reduce_weighted_mean(loss, weights):
+            weighted = tf.multiply(loss, weights)
+            return tf.divide(tf.reduce_sum(weighted),
+                             tf.reduce_sum(weights))
+
         if self._output_size == 1:
             self._logit_y_proba = tf.squeeze(self._logit_y_proba)
-            self._obj_func = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=self._logit_y_proba,
-                    labels=self._y))
+            cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=self._logit_y_proba,
+                labels=self._y)
+            self._obj_func = reduce_weighted_mean(
+                cross_entropy, self._sample_weight)
             self._y_proba = tf.sigmoid(self._logit_y_proba)
         else:
-            self._obj_func = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    logits=self._logit_y_proba,
-                    labels=self._y))
+            cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=self._logit_y_proba,
+                labels=self._y)
+            self._obj_func = reduce_weighted_mean(
+                cross_entropy, self._sample_weight)
             self._y_proba = tf.nn.softmax(self._logit_y_proba)
 
         if self.lambda_v > 0:
@@ -153,7 +163,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                 **self.solver_kwargs if self.solver_kwargs else {}).minimize(
                 self._obj_func)
 
-    def _make_feed_dict(self, X, y):
+    def _make_feed_dict(self, X, y, sample_weight=None):
         # Make the dictionary mapping tensor placeholders to input data.
         if self.is_sparse_:
             x_inds = np.vstack(X.nonzero())
@@ -172,6 +182,11 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             feed_dict[self._y] = y.astype(np.float32)
         else:
             feed_dict[self._y] = y.astype(np.int32)
+
+        if sample_weight is None:
+            feed_dict[self._sample_weight] = np.ones(X.shape[0])
+        else:
+            feed_dict[self._sample_weight] = sample_weight
 
         return feed_dict
 
@@ -215,7 +230,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
 
         return state
 
-    def fit(self, X, y):
+    def fit(self, X, y, monitor=None, sample_weight=None):
         """Fit the classifier.
 
         Parameters
@@ -224,6 +239,19 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             Training data.
         y : numpy array [n_samples]
             Targets.
+        monitor : callable, optional
+            The monitor is called after each iteration with the current
+            iteration, a reference to the estimator, and a dictionary with
+            {'loss': loss_value} representing the loss calculated by the
+            objective function at this iteration.
+            If the callable returns True the fitting procedure is stopped.
+            The monitor can be used for various things such as computing
+            held-out estimates, early stopping, model introspection,
+            and snapshotting.
+        sample_weight : numpy array of shape [n_samples,]
+            Per-sample weights. Re-scale the loss per sample.
+            Higher weights force the estimator to put more emphasis
+            on these samples. Sample weights are normalized per-batch.
 
         Returns
         -------
@@ -236,9 +264,11 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         self._is_fitted = False
 
         # Call partial fit, which will initialize and then train the model.
-        return self.partial_fit(X, y)
+        return self.partial_fit(X, y, monitor=monitor,
+                                sample_weight=sample_weight)
 
-    def partial_fit(self, X, y, classes=None, monitor=None):
+    def partial_fit(self, X, y, classes=None, monitor=None,
+                    sample_weight=None):
         """Fit the classifier.
 
         Parameters
@@ -260,6 +290,10 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
             The monitor can be used for various things such as computing
             held-out estimates, early stopping, model introspection,
             and snapshotting.
+        sample_weight : numpy array of shape [n_samples,]
+            Per-sample weights. Re-scale the loss per sample.
+            Higher weights force the estimator to put more emphasis
+            on these samples. Sample weights are normalized per-batch.
 
         Returns
         -------
@@ -267,6 +301,9 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
         """
 
         X, y = check_X_y(X, y, accept_sparse='csr')
+
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, ensure_2d=False)
 
         # check target type
         target_type = type_of_target(y)
@@ -338,8 +375,16 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                     for start_idx in range(0, n_examples, self.batch_size):
                         max_ind = min(start_idx + self.batch_size, n_examples)
                         batch_ind = indices[start_idx:max_ind]
-                        feed_dict = self._make_feed_dict(X[batch_ind],
-                                                         y[batch_ind])
+
+                        if sample_weight is None:
+                            batch_sample_weight = None
+                        else:
+                            batch_sample_weight = sample_weight[batch_ind]
+
+                        feed_dict = self._make_feed_dict(
+                            X[batch_ind],
+                            y[batch_ind],
+                            sample_weight=batch_sample_weight)
                         obj_val, _ = self._session.run(
                             [self._obj_func, self._train_step],
                             feed_dict=feed_dict)
@@ -356,7 +401,8 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
                                 "stopping early due to monitor function.")
                             return self
             else:
-                feed_dict = self._make_feed_dict(X, y)
+                feed_dict = self._make_feed_dict(
+                    X, y, sample_weight=sample_weight)
                 self._train_step.minimize(self._session,
                                           feed_dict=feed_dict)
 

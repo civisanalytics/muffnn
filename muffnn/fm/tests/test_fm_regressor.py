@@ -14,13 +14,14 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 from scipy.stats import pearsonr
-from sklearn.datasets import load_diabetes
+from sklearn.datasets import load_diabetes, make_regression
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.testing import assert_array_almost_equal, assert_equal
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_predict, KFold
 
-from ..fm_regressor import FMRegressor
+from muffnn import FMRegressor
+from muffnn.fm.tests.util import assert_sample_weights_work
 
 # toy dataset where Y = x[0] -2 * x[1] + 2 + err
 diabetes = load_diabetes()
@@ -62,11 +63,14 @@ def test_make_feed_dict():
     reg.is_sparse_ = False
     reg._y = 0
     reg._x = 1
+    reg._sample_weight = 'sample_weight'
 
     output_size = 1
 
     reg._output_size = output_size
     fd = reg._make_feed_dict(np.array(X), np.array(Y))
+    expected_keys = {0, 1, 'sample_weight'}
+    assert set(fd.keys()) == expected_keys
     assert_array_almost_equal(fd[reg._y], Y)
     assert fd[reg._y].dtype == np.float32, (
         "Wrong data type for y w/ output_size = 1 in feed dict!")
@@ -83,6 +87,7 @@ def test_make_feed_dict_sparse():
     reg._x_inds = 1
     reg._x_vals = 2
     reg._x_shape = 3
+    reg._sample_weight = 'sample_weight'
 
     # changing this so test catches indexing errors
     X = [[-1, 0], [0, 1], [2, 3]]
@@ -213,3 +218,12 @@ def test_cross_val_predict():
     p_r = pearsonr(Y, y_oos)[0]
 
     assert p_r >= 0.90, "Pearson R too low for fake data in cross_val_predict!"
+
+
+def test_sample_weight():
+    assert_sample_weights_work(
+        make_regression,
+        {'n_samples': 3000},
+        # TF SGD does not work so well....
+        lambda: FMRegressor(rank=2, solver='L-BFGS-B', random_state=4567)
+    )
