@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   features in MLPs with dense inputs.
 - Added support for SELU activations with alpha dropout.
 - Added sample weights for the `FMClassifier`.
+- Added `FMRegressor`.
 
 ### Fixed
 
