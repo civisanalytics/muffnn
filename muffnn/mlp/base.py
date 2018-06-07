@@ -564,7 +564,7 @@ def _csr_data(X):
     values : numpy array with shape (X.nnz)
              describing the values at each index
     """
-    indices = np.zeros((X.nnz, 2))
+    indices = np.zeros((X.nnz, 2), dtype=np.int64)
     values = np.zeros(X.nnz)
     i = 0
     for row_idx in range(X.shape[0]):

@@ -61,7 +61,8 @@ class SimpleTestEstimator(base.MLPBaseEstimator):
 def test_make_feed_dict_csr():
     X = scipy.sparse.csr_matrix((
         np.array([1, 2, 3, 4, 5, 6]),
-        (np.array([0, 0, 1, 2, 2, 2]), np.array([0, 2, 2, 0, 1, 2]))),
+        (np.array([0, 0, 1, 2, 2, 2], dtype=np.int64),
+         np.array([0, 2, 2, 0, 1, 2], dtype=np.int64))),
         shape=(3, 3))
     y = np.array([1, 2, 3])
 
@@ -76,7 +77,8 @@ def test_make_feed_dict_csr():
 def test_make_feed_dict_other():
     X = scipy.sparse.coo_matrix((
         np.array([1, 2, 3, 4, 5, 6]),
-        (np.array([0, 0, 1, 2, 2, 2]), np.array([0, 2, 2, 0, 1, 2]))),
+        (np.array([0, 0, 1, 2, 2, 2], dtype=np.int64),
+         np.array([0, 2, 2, 0, 1, 2], dtype=np.int64))),
         shape=(3, 3))
     y = np.array([1, 2, 3])
 
