@@ -4,19 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [2.2.0] - 2018-06-07
 
 ### Added
 
 - Added `prediction_gradient` method for understanding the impact of different
   features in MLPs with dense inputs.
 - Added support for SELU activations with alpha dropout.
+- Added sample weights for the `FMClassifier`.
+- Added `FMRegressor`.
 
 ### Fixed
 
 - Exposed `muffnn.__version__`.
 - Fixed bug in `FMClassifier` where it failed for predicting one example.
-- Fixed ValueError for type of target in MLPClassifier and FMClassifier (#90).
+- Fixed ValueError for type of target in `MLPClassifier` and `FMClassifier` (#90).
 
 ### Changed
 
