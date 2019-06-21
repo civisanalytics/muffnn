@@ -53,21 +53,22 @@ def test_sample_weight():
     )
 
 
-# Make a subclass that has its default number of epochs high enough not to fail
-# the toy example tests that have only a handful of examples.
-class MLPRegressorManyEpochs(MLPRegressor):
-    def __init__(self, hidden_units=(256,), batch_size=64,
-                 keep_prob=1.0, activation=nn.relu):
-        super(MLPRegressorManyEpochs, self).__init__(
+# Make a subclass that has no `solver` parameter. The scikit-learn
+# `check_estimator` has a check which fails with a class as a default.
+class MLPRegressorFewerParams(MLPRegressor):
+    def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
+                 keep_prob=1.0, activation=nn.relu,
+                 random_state=None):
+        super(MLPRegressorFewerParams, self).__init__(
             hidden_units=hidden_units, batch_size=batch_size,
-            n_epochs=50, keep_prob=keep_prob,
+            n_epochs=n_epochs, keep_prob=keep_prob,
             activation=activation,
-            random_state=42)
+            random_state=random_state)
 
 
 def test_check_estimator():
     """Check adherence to Estimator API."""
-    check_estimator(MLPRegressorManyEpochs)
+    check_estimator(MLPRegressorFewerParams)
 
 
 def test_predict():
