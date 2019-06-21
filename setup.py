@@ -21,5 +21,5 @@ setup(
     install_requires=['numpy',
                       'scipy',
                       'scikit-learn~=0.19',
-                      'tensorflow~=1.4']
+                      'tensorflow>=1.12.1']
 )
