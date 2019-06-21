@@ -75,9 +75,30 @@ def _cross_entropy(ytrue, ypred):
     return np.sum(ce, axis=1)
 
 
+class AutoencoderManyEpochs(Autoencoder):
+    """Increase default model capacity and number of epochs so that
+    the default Estimator will pass scikit-learn's sanity checks.
+    """
+    def __init__(self, hidden_units=(256,), batch_size=128, n_epochs=300,
+                 keep_prob=1.0, hidden_activation=tf.nn.relu,
+                 encoding_activation=None,
+                 output_activation=None, random_state=None,
+                 learning_rate=1e-3, loss='mse', sigmoid_indices=None,
+                 softmax_indices=None):
+        super(AutoencoderManyEpochs, self).__init__(
+            hidden_units=hidden_units, batch_size=batch_size,
+            n_epochs=n_epochs, keep_prob=keep_prob,
+            hidden_activation=hidden_activation,
+            encoding_activation=encoding_activation,
+            output_activation=output_activation, random_state=random_state,
+            learning_rate=learning_rate, loss=loss,
+            sigmoid_indices=sigmoid_indices, softmax_indices=softmax_indices,
+        )
+
+
 def test_check_estimator():
     """Check adherence to Estimator API."""
-    check_estimator(Autoencoder)
+    check_estimator(AutoencoderManyEpochs)
 
 
 def test_persistence():
