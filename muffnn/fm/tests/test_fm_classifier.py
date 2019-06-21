@@ -13,7 +13,10 @@ import pickle
 import numpy as np
 import pytest
 import scipy.sparse as sp
-from scipy.misc import logsumexp
+try:
+    from scipy.misc import logsumexp
+except ImportError:
+    from scipy.special import logsumexp
 from sklearn.datasets import load_iris, make_classification
 from sklearn.linear_model.tests.test_logistic import check_predictions
 from sklearn.utils.estimator_checks import check_estimator
