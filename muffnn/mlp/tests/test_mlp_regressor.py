@@ -60,7 +60,7 @@ class MLPRegressorManyEpochs(MLPRegressor):
                  keep_prob=1.0, activation=nn.relu):
         super(MLPRegressorManyEpochs, self).__init__(
             hidden_units=hidden_units, batch_size=batch_size,
-            n_epochs=100, keep_prob=keep_prob,
+            n_epochs=50, keep_prob=keep_prob,
             activation=activation,
             random_state=42)
 
