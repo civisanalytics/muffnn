@@ -9,6 +9,11 @@ from __future__ import division
 
 from io import BytesIO
 import pickle
+import sys
+try:
+    from unittest import mock
+except ImportError:
+    mock = None
 
 import six
 import numpy as np
@@ -76,7 +81,15 @@ class MLPClassifierManyEpochs(MLPClassifier):
 
 def test_check_estimator():
     """Check adherence to Estimator API."""
-    check_estimator(MLPClassifierManyEpochs)
+    if sys.version_info.major == 3 and sys.version_info.minor == 7:
+        # Starting in Tensorflow 1.14 and Python 3.7, there's one module
+        # with a `0` in the __warningregistry__. Scikit-learn tries to clear
+        # this dictionary in its tests.
+        name = 'tensorboard.compat.tensorflow_stub.pywrap_tensorflow'
+        with mock.patch.object(sys.modules[name], '__warningregistry__', {}):
+            check_estimator(MLPClassifierManyEpochs)
+    else:
+        check_estimator(MLPClassifierManyEpochs)
 
 
 def check_multilabel_predictions(clf, X, y):

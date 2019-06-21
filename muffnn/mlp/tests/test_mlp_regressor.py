@@ -4,6 +4,12 @@ Tests for MLP Regressor
 from __future__ import print_function
 from __future__ import division
 
+import sys
+try:
+    from unittest import mock
+except ImportError:
+    mock = None
+
 import numpy as np
 import pytest
 from sklearn.utils.testing import \
@@ -68,7 +74,15 @@ class MLPRegressorFewerParams(MLPRegressor):
 
 def test_check_estimator():
     """Check adherence to Estimator API."""
-    check_estimator(MLPRegressorFewerParams)
+    if sys.version_info.major == 3 and sys.version_info.minor == 7:
+        # Starting in Tensorflow 1.14 and Python 3.7, there's one module
+        # with a `0` in the __warningregistry__. Scikit-learn tries to clear
+        # this dictionary in its tests.
+        name = 'tensorboard.compat.tensorflow_stub.pywrap_tensorflow'
+        with mock.patch.object(sys.modules[name], '__warningregistry__', {}):
+            check_estimator(MLPRegressorFewerParams)
+    else:
+        check_estimator(MLPRegressorFewerParams)
 
 
 def test_predict():
