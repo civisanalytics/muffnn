@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+### Fixed
+- Updated tests for changes in new versions of `scipy`, `scikit-learn`, and `flake8` (#98).
+- Increased required version of `tensorflow` due to published CVEs in older versions (#98).
+
 ## [2.2.0] - 2018-06-07
 
 ### Added
