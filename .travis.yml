@@ -12,6 +12,7 @@ install:
     - pip install --upgrade pip setuptools
     - pip install -r dev-requirements.txt
     - pip install -e .
+    - pip list
 script:
     - flake8 muffnn
     - py.test -vv muffnn
