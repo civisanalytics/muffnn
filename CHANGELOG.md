@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## [2.3.0] - 2019-11-22
+
+### Changed
+- Allowed a recent version of `scikit-learn` (#99).
+
 ### Fixed
 - Updated tests for changes in new versions of `scipy`, `scikit-learn`, and `flake8` (#98).
 - Increased required version of `tensorflow` due to published CVEs in older versions (#98).
