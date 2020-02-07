@@ -11,6 +11,10 @@ muffnn
    :target: https://pypi.org/project/muffnn/
    :alt: Latest version on PyPI
 
+.. |PyVersions| image:: https://img.shields.io/pypi/pyversions/muffnn.svg
+   :target: https://pypi.org/project/muffnn/
+   :alt: Supported python versions for muffnn
+
 `scikit-learn <http://scikit-learn.org>`__-compatible neural network
 models implemented in `TensorFlow <https://www.tensorflow.org/>`__
 
