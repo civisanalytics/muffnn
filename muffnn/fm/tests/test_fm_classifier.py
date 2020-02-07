@@ -4,16 +4,10 @@ Tests for the FM classifier.
 based in part on sklearn's logistic tests:
 https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/tests/test_logistic.py
 """
-from __future__ import print_function
-from __future__ import division
-
 from io import BytesIO
 import pickle
 import sys
-try:
-    from unittest import mock
-except ImportError:
-    mock = None
+from unittest import mock
 
 import numpy as np
 import pytest

@@ -4,18 +4,12 @@ Tests for MLP classifier
 based in part on sklearn's logistic tests:
 https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/tests/test_logistic.py
 """
-from __future__ import print_function
-from __future__ import division
-
 from io import BytesIO
 import pickle
 import sys
-try:
-    from unittest import mock
-except ImportError:
-    mock = None
+from unittest import mock
+from unittest.mock import MagicMock
 
-import six
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -33,11 +27,6 @@ from tensorflow import nn
 
 from muffnn import MLPClassifier
 from muffnn.mlp.tests.util import assert_sample_weights_work
-
-if six.PY2:
-    from mock import MagicMock
-else:
-    from unittest.mock import MagicMock
 
 
 iris = load_iris()

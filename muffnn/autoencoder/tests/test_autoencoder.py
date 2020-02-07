@@ -1,18 +1,12 @@
 """
 Tests for the Autoencoder.
 """
-from __future__ import print_function
-from __future__ import division
-
 import logging
 import pprint
 from io import BytesIO
 import pickle
 import sys
-try:
-    from unittest import mock
-except ImportError:
-    mock = None
+from unittest import mock
 
 import pytest
 import numpy as np
