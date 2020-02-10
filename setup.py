@@ -28,6 +28,6 @@ setup(
     ],
     install_requires=['numpy>=1.17',
                       'scipy>=1.4',
-                      'scikit-learn>=0.19',
+                      'scikit-learn>=0.19,<0.22.1',
                       'tensorflow>=1.12.1,<2']
 )
