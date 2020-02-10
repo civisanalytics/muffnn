@@ -27,7 +27,7 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     install_requires=['numpy>=1.17',
-                      'scipy<1.4',
+                      'scipy>=1.4',
                       'scikit-learn>=0.19',
                       'tensorflow>=1.12.1,<2']
 )
