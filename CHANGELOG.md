@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Increase minimum version of `tensorflow` to v1.15.2 to fix the security vulnerability reported in https://github.com/tensorflow/tensorflow/security/advisories/GHSA-977j-xj7q-2jr9 (#101).
+- Dropped support for Python 2.7 and 3.4 (#101).
 
 ## [2.3.0] - 2019-11-22
 

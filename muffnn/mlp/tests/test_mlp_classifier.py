@@ -4,18 +4,13 @@ Tests for MLP classifier
 based in part on sklearn's logistic tests:
 https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/tests/test_logistic.py
 """
-from __future__ import print_function
-from __future__ import division
 
 from io import BytesIO
 import pickle
 import sys
-try:
-    from unittest import mock
-except ImportError:
-    mock = None
+from unittest import mock
+from unittest.mock import MagicMock
 
-import six
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -33,11 +28,6 @@ from tensorflow import nn
 
 from muffnn import MLPClassifier
 from muffnn.mlp.tests.util import assert_sample_weights_work
-
-if six.PY2:
-    from mock import MagicMock, patch
-else:
-    from unittest.mock import MagicMock, patch
 
 
 iris = load_iris()
@@ -84,7 +74,7 @@ class MLPClassifierManyEpochs(MLPClassifier):
 # replicate outside of travis, but I was able to get the test to fail locally
 # by changing atol in sklearn.utils.check_methods_subset_invariance from 1e-7
 # to 1e-10. This simply skips that part of check_estimator.
-@patch('sklearn.utils.estimator_checks.check_methods_subset_invariance')
+@mock.patch('sklearn.utils.estimator_checks.check_methods_subset_invariance')
 def test_check_estimator(mock_check_methods_subset_invariance):
     """Check adherence to Estimator API."""
     if sys.version_info.major == 3 and sys.version_info.minor == 7:

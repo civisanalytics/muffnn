@@ -1,11 +1,7 @@
-from __future__ import print_function
-from __future__ import division
-
 from io import BytesIO
 import pickle
 
 import pytest
-import six
 import numpy as np
 import scipy.sparse
 import tensorflow as tf
@@ -13,10 +9,7 @@ from tensorflow.python.ops import nn
 
 import muffnn.mlp.base as base
 
-if six.PY2:
-    import mock
-else:
-    from unittest import mock
+from unittest import mock
 
 
 class SimpleTestEstimator(base.MLPBaseEstimator):

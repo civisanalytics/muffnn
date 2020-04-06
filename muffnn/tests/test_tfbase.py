@@ -1,8 +1,6 @@
 """
 Tests for TFPicklingBase
 """
-from __future__ import print_function
-from __future__ import division
 
 import io
 import pickle

@@ -3,8 +3,6 @@ A Deep Neural Network (multilayer Perceptron) sklearn-style regressor.
 
 Similar to sklearn.neural_network.MLPRegressor, but using TensorFlow.
 """
-from __future__ import print_function
-from __future__ import division
 
 import logging
 from warnings import warn

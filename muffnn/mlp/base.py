@@ -4,11 +4,8 @@ class.
 
 Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 """
-from __future__ import print_function
-from __future__ import division
 
 from abc import ABCMeta, abstractmethod
-import six
 import logging
 import re
 from warnings import warn
@@ -32,8 +29,7 @@ from muffnn.core import TFPicklingBase, affine
 _LOGGER = logging.getLogger(__name__)
 
 
-@six.add_metaclass(ABCMeta)
-class MLPBaseEstimator(TFPicklingBase, BaseEstimator):
+class MLPBaseEstimator(TFPicklingBase, BaseEstimator, metaclass=ABCMeta):
     """Base class for multilayer perceptron models
 
     Notes

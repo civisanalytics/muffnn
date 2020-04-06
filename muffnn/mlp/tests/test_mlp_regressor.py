@@ -1,14 +1,9 @@
 """
 Tests for MLP Regressor
 """
-from __future__ import print_function
-from __future__ import division
 
 import sys
-try:
-    from unittest import mock
-except ImportError:
-    mock = None
+from unittest import mock
 
 import numpy as np
 import pytest
