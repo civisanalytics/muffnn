@@ -1,8 +1,6 @@
 """
 Autoencoder in scikit-learn style with TensorFlow
 """
-from __future__ import print_function
-from __future__ import division
 
 import logging
 import re

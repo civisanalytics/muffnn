@@ -3,8 +3,6 @@ A Deep Neural Network (multilayer Perceptron) sklearn-style classifier.
 
 Similar to sklearn.neural_network.MLPClassifier, but using TensorFlow.
 """
-from __future__ import print_function
-from __future__ import division
 
 import logging
 
