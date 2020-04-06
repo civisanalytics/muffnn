@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-_VERSION = '2.3.0'
+_VERSION = '2.3.1'
 
 CLASSIFIERS = [
     'Programming Language :: Python',
