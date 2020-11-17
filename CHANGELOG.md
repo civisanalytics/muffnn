@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## [2.3.2] - 2020-11-18
+
+### Changed
+
+- Increase minimum version of `tensorflow` to v1.15.4 to fix the security vulnerability reported in https://github.com/advisories/GHSA-4g9f-63rx-5cw4 (#105)
+- Set more specific `scikit-learn` version requirements to avoid incompatibilities and test failures (#105)
+
+### Removed
+- Remove Python 3.5 support (#105)
+
 ## [2.3.1] - 2020-04-06
 
 ### Fixed
