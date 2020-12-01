@@ -17,7 +17,7 @@ models implemented in `TensorFlow <https://www.tensorflow.org/>`__
 Installation
 ============
 
-This package currently supports Python 3.5, 3.6, and 3.7.
+This package currently supports Python 3.6 and 3.7.
 
 Installation with ``pip`` is recommended:
 

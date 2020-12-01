@@ -3,12 +3,11 @@ from setuptools import find_packages, setup
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-_VERSION = '2.3.1'
+_VERSION = '2.3.2'
 
 CLASSIFIERS = [
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3 :: Only',
@@ -28,7 +27,7 @@ setup(
     license="BSD-3",
     install_requires=['numpy',
                       'scipy',
-                      'scikit-learn>=0.19',
-                      'tensorflow>=1.15.2,<2'],
+                      'scikit-learn>=0.20.0,<0.23.0',
+                      'tensorflow>=1.15.4,<2'],
     classifiers=CLASSIFIERS
 )

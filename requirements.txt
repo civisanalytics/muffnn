@@ -1,4 +1,4 @@
 numpy~=1.14
 scipy~=1.0
-scikit-learn>=0.19
-tensorflow>=1.15.2,<2
+scikit-learn>=0.20.0,<0.23.0
+tensorflow>=1.15.4,<2
