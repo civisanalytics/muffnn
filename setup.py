@@ -28,6 +28,6 @@ setup(
     install_requires=['numpy',
                       'scipy',
                       'scikit-learn>=0.20.0,<0.23.0',
-                      'tensorflow>=1.15.4,<2'],
+                      'tensorflow==2.5.*'],
     classifiers=CLASSIFIERS
 )
