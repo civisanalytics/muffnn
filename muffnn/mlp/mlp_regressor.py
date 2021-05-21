@@ -83,7 +83,7 @@ class MLPRegressor(MLPBaseEstimator, RegressorMixin):
 
     def __init__(self, hidden_units=(256,), batch_size=64, n_epochs=5,
                  keep_prob=1.0, activation=nn.relu,
-                 random_state=None, solver=tf.train.AdamOptimizer,
+                 random_state=None, solver=tf.keras.optimizers.Adam,
                  solver_kwargs=None, transform_layer_index=None):
         self.hidden_units = hidden_units
         self.batch_size = batch_size

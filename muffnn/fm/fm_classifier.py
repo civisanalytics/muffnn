@@ -63,7 +63,7 @@ class FMClassifier(TFPicklingBase, ClassifierMixin, BaseEstimator):
     """
     def __init__(self, rank=8, batch_size=64, n_epochs=5,
                  random_state=None, lambda_v=0.0,
-                 lambda_beta=0.0, solver=tf.train.AdadeltaOptimizer,
+                 lambda_beta=0.0, solver=tf.keras.optimizers.Adadelta,
                  init_scale=0.1, solver_kwargs=None):
         self.rank = rank
         self.batch_size = batch_size

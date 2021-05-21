@@ -215,7 +215,7 @@ class Autoencoder(TFPicklingBase, TransformerMixin, BaseEstimator):
                 message=("Converting sparse IndexedSlices to a dense Tensor "
                          "of unknown shape"),
                 module='tensorflow')
-            self._train_step = tf.train.AdamOptimizer(
+            self._train_step = tf.keras.optimizers.Adam(
                 learning_rate=self.learning_rate).minimize(self._obj_func)
 
     def _build_output_layer_and_scores(self, t):
